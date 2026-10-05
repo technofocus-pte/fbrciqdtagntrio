@@ -1,889 +1,973 @@
-# Use Case 1 - From Semantics to Insights: Leveraging Fabric IQ Ontology with Fabric Data Agents
+# Usecase 01: From Semantics to Insights: Leveraging Fabric IQ Ontology with Fabric Data Agents
 
-### Introduction
+**Scenario**
 
-In modern data platforms, enterprises often need a **business-centric semantic layer** that unifies meaning across diverse data sources and analytical models. The *Ontology (preview)* feature in Microsoft Fabric IQ enables you to build this layer by defining **enterprise concepts** (like products, stores, and events) and **their relationships**, then binding these definitions to real data across your lakehouse, semantic models, and event streams.
+**Lakeshore Retail** is a fictional multi-region retailer that sells general merchandise, perishable goods, and frozen products (such as ice cream) through stores that are supplied by regional distribution centers.
 
-In the scenario, a fictional company called **Lakeshore Retail**, which sells ice cream at multiple locations. Using sample data, the tutorial shows how to set up your environment and begin building an ontology that captures business concepts such as *Store*, *Products*, and *SaleEvent*. You'll also connect streaming data (like freezer temperatures from Eventhouse) to these concepts so the ontology can support **cross-domain reasoning and queries**, for instance: *"Which stores have lower ice cream sales when freezer temperature rises above -18 °C?"*
+Lakeshore Retail's data is spread across several systems:
 
-### Objectives
+- **Lakehouse tables** with locations (stores and distribution centers), products, suppliers, inventory positions, shipments, and refrigeration units.
 
-- Prepare a Microsoft Fabric workspace with required services, including Lakehouse, Eventhouse, and Ontology (preview).
+- **Streaming telemetry** from the refrigeration units in each store (temperature, humidity, door status) in an eventhouse.
 
-- Build a business-centric ontology by defining core entity types such as Store, Products, SaleEvent, and Freezer.
+- A **Power BI semantic model** with sales transactions and sales measures.
 
-- ind static data from OneLake tables and time-series data from Eventhouse to ontology entities.
+The operations team needs to answer cross-domain questions quickly, for example:
 
-- Create meaningful relationships between entities to represent real business processes (for example, Store has SaleEvent and Store operates Freezer).
+*Which high-priority stores in the West have frozen products below safety stock, a recent refrigeration-temperature exception, and on-shelf availability below target? For each store, show the next inbound shipment and its expected arrival.*
 
-- Explore and validate the ontology using entity instances, relationship graphs, and query builder filters.
+Answering this today means joining inventory, telemetry, location, and shipment data by hand. In this lab, you are a Lakeshore Retail data engineer. You build an ontology named **RetailSalesOntology** that connects all these sources in business terms, enrich it with descriptions and business rules, explore it as a graph, and use the **Ontology agent** to answer the scenario question in natural language.
 
-- Enable natural language querying by integrating the ontology with a Fabric Data Agent (preview).
+**Introduction**
 
+Modern data platforms need a **business-centric semantic layer**: a shared model that describes the business in its own terms and works the same way across many data sources. The **Ontology (preview)** item in **Microsoft Fabric IQ** provides this layer. In an ontology, you define **entity types** (business concepts such as stores, products, and shipments), their **properties**, the **relationships** between them, and business **rules**, and then bind these definitions to real data in OneLake: lakehouse tables, eventhouse (streaming) tables, and Power BI semantic models.
 
-# Exercise 1: Environment Setup
+Once the ontology is in place, people and AI agents can explore it as a **graph** and ask questions in **natural language** without knowing the underlying tables or joins.
 
-## Task 1: Create a Fabric workspace
+This lab is based on the Microsoft Learn tutorial series [Ontology (preview) tutorial](https://learn.microsoft.com/fabric/iq/ontology/tutorial-0-introduction).
 
-In this task, you create a Fabric workspace. The workspace contains all the items needed for this lakehouse tutorial, which includes lakehouse, dataflows, Data Factory pipelines, the notebooks, Power BI datasets, and reports.
+**Objectives**
 
-1. Open your browser, navigate to the address bar, and type or paste the following URL: +++https://app.fabric.microsoft.com/+++ then press the **Enter** button and sign in with your credentials
+After completing this lab, you will be able to:
 
-    | Credential | Value |
-    |------------|-------|
-    | Username | +++@lab.CloudPortalCredential(User1).Username+++ |
-    | Password | +++@lab.CloudPortalCredential(User1).Password+++ |
+- Prepare a Microsoft Fabric workspace with a lakehouse, an eventhouse, and a semantic model as data sources
 
-1. In the portal, switch to Fabric Mode before proceeding to create workspace.
+- Create an **Ontology (preview)** item and define entity types, including inherited entity types
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/imga1.png)
+- Bind entity types to static data in OneLake tables, time series data in an eventhouse, and a Power BI semantic model
 
-1. In the Workspaces pane, click on **+New workspace** tile
+- Create relationship types that represent real business processes (for example, Store *operates* Refrigeration Unit)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image1.png)
+- Enrich the ontology with entity, property, and relationship metadata and business rules
 
-1. In the **Create a workspace** pane that appears on the right side, enter the following details, and click on the **Apply** button.
+- Explore and validate the ontology with canvas views, entity instances, the materialized graph, and path queries
 
-    | Setting | Value |
-    |----------|----------|
-    | Name | +++Fabric IQ Ontology@lab.LabInstance.Id+++|
-    | Advanced | Under **License mode**, select **Fabric capacity** |
-    | Default storage format | **Small dataset storage format** |
+- Ask questions in natural language with the **Ontology agent**
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image2.png)
+**Architecture**
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image3.png)
+| **Component**                                 | **Role in the lab**                                                                              |
+|-----------------------------------------------|--------------------------------------------------------------------------------------------------|
+| Fabric workspace Fabric IQ Ontology\<number\> | Contains all the items for the lab                                                               |
+| Lakehouse IQ_Lakehouse                        | Static data: locations, products, suppliers, inventory positions, shipments, refrigeration units |
+| Eventhouse TelemetryDataEH (KQL database)     | Streaming data: RefrigerationTelemetry table                                                     |
+| Semantic model SalesReport                    | Sales transactions and measures (Gross Margin %, Net Sales)                                      |
+| Ontology RetailSalesOntology                  | Business entity types, relationships, metadata, and rules bound to the data                      |
+| Graph model                                   | Materialized graph of the ontology for exploration and path queries                              |
+| Ontology agent (preview)                      | Copilot that answers natural-language questions over the ontology                                |
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image4.png)
+**Target ontology**
 
+| **Entity type**         | **Inherits from** | **Data source**                                                       |
+|-------------------------|-------------------|-----------------------------------------------------------------------|
+| Location                |                   | IQ_Lakehouse \> dimlocations                                          |
+| Store                   | Location          | IQ_Lakehouse \> dimlocations                                          |
+| Distribution Center     | Location          | IQ_Lakehouse \> dimlocations                                          |
+| Product                 |                   | IQ_Lakehouse \> dimproducts                                           |
+| Frozen Product          | Product           | IQ_Lakehouse \> dimproducts                                           |
+| Perishable Product      | Product           | IQ_Lakehouse \> dimproducts                                           |
+| Inventory               |                   | IQ_Lakehouse \> fact_inventory_positions                              |
+| Supplier                |                   | IQ_Lakehouse \> dimsuppliers                                          |
+| Shipment                |                   | IQ_Lakehouse \> factshipments                                         |
+| Refrigeration Unit      |                   | IQ_Lakehouse \> dim_refrigeration_units                               |
+| Refrigeration Telemetry |                   | TelemetryDataEH \> RefrigerationTelemetry                             |
+| Sale                    |                   | SalesReport semantic model \> Sales (created with the Ontology agent) |
 
-## Task 2: Create a lakehouse
+**Prerequisites**
 
-1. Create a new lakehouse by clicking on the **+New item** button in the navigation bar.
+- A workspace on a **Microsoft Fabric-enabled capacity**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image5.png)
+- A Fabric administrator has enabled the tenant settings for **Ontology (preview)** items, Fabric items, and Copilot / Azure OpenAI features (required for the Ontology agent).
 
-1. Filter by, and select, the +++Lakehouse+++ tile.
+- The lab files in **C:\LabFiles\Lab1** on the lab VM: six CSV files with the static data, **refrigeration_telemetry.csv**, and **SalesReport.pbix**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image6.png)
+**Note:** Ontology, the Ontology agent, and graph in Microsoft Fabric are in **preview**. Screens and labels may change slightly. AI-generated answers may be incorrect; always check important answers against the source data.
 
-1. In the **New lakehouse** dialog box, enter +++IQ_Lakehouse+++ in the **Name** field and **unselect** the lakehouses schemas. Click on the **Create** button and open the new lakehouse.
+## Exercise 1: Set up the environment
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image7.png)
+In this exercise, you prepare the three data sources for the ontology: a lakehouse with static data, an eventhouse with streaming data, and a Power BI semantic model with sales data.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image8.png)
+### Task 1: Create a Fabric workspace
 
-1. You will see a notification stating **Successfully created SQL endpoint**.
+1.  Open your browser, go to +++https://app.fabric.microsoft.com/+++, and sign in with your credentials.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image9.png)
+| **Username** | **+++@lab.CloudPortalCredential(User1).Username+++** |
+| **Password** | **+++@lab.CloudPortalCredential(User1).Password+++** |
 
+2.  On the Fabric home page, select **+ New workspace**.
 
-## Task 3: Ingest sample data
+![](./media/image1.png)
 
-1. In the **IQ_Lakehouse** page, navigate to **Get data in your lakehouse** section, and click on **Upload files as shown in the below image.**
+3.  In the **Create a workspace** pane, enter the following details:
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image10.png)
+    - **Name**: +++Fabric IQ Ontology@lab.LabInstance.Id+++ (the name must be unique)
 
-1. On the Upload files tab, click on the folder under the Files
+    - Expand **Advanced**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image11.png)
+![](./media/image2.png)
 
-1. Browse to **C:\LabFiles\Lab1** on your VM, then select **DimProducts.csv, DimStore.csv, FactSale.csv** and **Freezer.csv** file and click on **Open** button.
+4.  Under **License mode**, select **Fabric**, and then select **Apply**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image12.png)
+![](./media/image3.png)
 
-1. Then, click on the **Upload** button and close the **Upload files** dialog by selecting the **X** icon for the dialog.
+5.  The new workspace opens.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image13.png)
+![](./media/image4.png)
 
-    ![A screenshot of a upload box AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image14.png)
+### Task 2: Create a lakehouse
 
+1.  In the workspace, select **+ New item**.
 
-1. Select **Files**. The file appears in the Files pane.
+![](./media/image5.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image15.png)
+2.  Filter by and select **Lakehouse**.
 
-1. In the **Lakehouse** page, Under the Explorer pane select **Files**. Now, hover your mouse over the **DimProducts.csv** file. Click on the horizontal ellipses **(…)** beside **DimProducts.csv** . Navigate and click on **Load Table**, then select **New table**.
+![](./media/image6.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image16.png)
+3.  In the **New Lakehouse** dialog, enter +++IQ_Lakehouse+++ in the **Name** box, clear the **Lakehouse schemas** checkbox, and then select **Create**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image17.png)
+![](./media/image7.png)
 
-1. In the **Load file to new table** dialog box, click on the **Load** button.
+**Note:** The Microsoft Learn tutorial keeps **Lakehouse schemas** selected, in which case the tables are created in the **dbo** schema. The rest of this lab works either way.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image18.png)
+4.  The lakehouse opens. Wait for the notification **Successfully created SQL analytics endpoint**.
 
-1. Now successfully created **DimProducts** table
+![](./media/image8.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image19.png)
+![](./media/image9.png)
 
-1. Select the **DimProducts** table to preview the data.
+### Task 3: Load the static data into lakehouse tables
 
-    >[!Note] You may need to select the **Refresh** button more than once to preview the data.
+1.  On the **IQ_Lakehouse** page, under **Get data in your lakehouse**, select **Upload files**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image20.png)
+![](./media/image10.png)
 
-1. Repeat Steps 7 through 9 to push the remaining files into the tables.
+2.  In the **Upload files** pane, select the folder icon.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image21.png)
+![](./media/image11.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image22.png)
+3.  Browse to **C:\LabFiles\Lab1**, select the six CSV files **dim_refrigeration_units**, **dimlocations**, **dimproducts**, **dimsuppliers**, **fact_inventory_positions**, and **factshipments**, and then select **Open**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image23.png)
+![](./media/image12.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image24.png)
+**Important:** Don't upload **refrigeration_telemetry.csv** or **SalesReport.pbix**. You load them into the eventhouse and the workspace later in this exercise.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image25.png)
+4.  Select **Upload**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image26.png)
+![](./media/image13.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image27.png)
+5.  Verify that all six files are uploaded, and then close the **Upload files** pane by selecting **X**.
 
-1. From the left navigation bar, select **Fabric IQ Ontology**.
+![](./media/image14.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image28.png)
+6.  In the **Explorer**, select **Files** and verify that the six files are listed. Select **Refresh** if needed.
 
+![](./media/image15.png)
 
-## Task 4: Prepare the eventhouse
+7.  Hover over **dim_refrigeration_units.csv**, select **...**, and then select **Load to Tables \> New table**.
 
-Follow these steps to upload the device streaming data file to a KQL database in Eventhouse.
+![](./media/image16.png)
 
-1. On the **Fabric IQ Ontology** home page, select **+New item** and select **Eventhouse**.
+![](./media/image17.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image29.png)
+8.  In the **Load file to new table** dialog, keep the default table name and settings, and then select **Load**.
 
-1. Name the Eventhouse +++TelemetryDataEH+++ and click on the **Create** button.
+![](./media/image18.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image30.png)
+9.  Verify that the **dim_refrigeration_units** table appears under **Tables**.
 
-1. The eventhouse opens when it's ready
+![](./media/image19.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image31.png)
+**Note:** You may need to select **Refresh** more than once to see the table and preview its data.
 
-1. Open the KQL database by selecting its name.
+10. Repeat steps 7-9 for each of the remaining five files. For example, for **dimlocations.csv**, select **... \> Load to Tables \> New table**, and then select **Load**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image32.png)
+![](./media/image20.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image33.png)
+![](./media/image21.png)
 
-1. On the lower ribbon of your **KQL database**, click on **Get data**, then select **Local file** to upload files from your local system into the database.![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image34.png)
+11. When you're done, the lakehouse has six tables: **dim_refrigeration_units**, **dimlocations**, **dimproducts**, **dimsuppliers**, **fact_inventory_positions**, and **factshipments**. The default table names are the file names in lowercase.
 
-1. Select the target option to ingest data into a new table, click + New table, and enter a table name as +++FreezerTelemetry+++.
+![](./media/image22.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image35.png)
+12. In the left navigation bar, select your workspace **Fabric IQ Ontology\<number\>**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image36.png)
+![](./media/image23.png)
 
-1. Select the destination table, then drag and drop the files or click *Browse for files* to upload the data.
+### Task 4: Load the streaming data into an eventhouse
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image37.png)
+1.  In the workspace, select **+ New item**, and then select **Eventhouse**.
 
-1. Browse to **C:\LabFiles\Lab1** on your VM, then select ***FreezerTelemetry*.csv** file and click on **Open** button.
+![](./media/image24.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image38.png)
+2.  Enter +++TelemetryDataEH+++ as the **Eventhouse name**, and then select **Create**.
 
-1. Click on **Next** button
+![](./media/image25.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image39.png)
+3.  The eventhouse opens when it's ready. A KQL database with the same name is created automatically.
 
-1. Then click on the **Finish** button.
+![](./media/image26.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image40.png)
+4.  Under **KQL databases**, select **TelemetryDataEH** to open the database.
 
-1. Wait for the Data ingestion to be completed, and click **Close**.
+![](./media/image27.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image41.png)
+![](./media/image28.png)
 
-1. The KQL database shows the **FreezerTelemetry** table when you're done:
+5.  On the ribbon, select **Get data \> Local file**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image42.png)
+![](./media/image29.png)
 
-1. Select **Fabric IQ Ontology** in the left navigation pane.
+6.  Under **Select or create a destination table**, select **+ New table**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image43.png)
+![](./media/image30.png)
 
+7.  Enter +++RefrigerationTelemetry+++ as the table name, select the check mark, and then select **Browse for files**.
 
-# Exercise 2: Building an ontology from OneLake
+![](./media/image31.png)
 
-## Task 1: Create ontology (preview) item
+![](./media/image32.png)
 
-1. In your Fabric workspace, select **+ New item**. Search for and select the **Ontology (preview)** item.
+8.  Browse to **C:\LabFiles\Lab1**, select **refrigeration_telemetry.csv**, and then select **Open**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image44.png)
+![](./media/image33.png)
 
-1. Enter +++RetailSalesOntology+++ for the +++Name+++ of your ontology and select **Create**.
+9.  Select **Next**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image45.png)
+![](./media/image34.png)
 
-    >[!Tip] Ontology names can include numbers, letters, and underscores. Don't use spaces or dashes.
+10. On the **Inspect the data** page, review the columns (**TelemetryId**, **UnitId**, **Timestamp**, **TemperatureC**, and more), and then select **Finish**.
 
-1. The ontology opens when it's ready.
+![](./media/image35.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image46.png)
+11. Wait until the ingestion shows **1 blobs: 1 succeeded, 0 failed**, and then select **Close**.
 
-    > Next, create entity types, data bindings, and relationships based on
-    > data from your lakehouse tables.
+![](./media/image36.png)
 
+12. Verify that the KQL database shows the **RefrigerationTelemetry** table.
 
-## Task 2: Create entity types and data bindings
+![](./media/image37.png)
 
-> First, create entity types. Entity types represent types of objects in
-> a business. This step has three entity types: *Store*, *Products*,
-> and *SaleEvent*. After you create the entity types, create their
-> properties by binding source data columns in
-> the ***IQ_Lakehouse*** lakehouse tables.
+13. In the left navigation bar, select your workspace.
 
-### Add first entity type (Store)
+![](./media/image38.png)
 
-1. From the top ribbon or the center of the configuration canvas, select **Add entity type**.
+### Task 5: Upload the semantic model
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image47.png)
+1.  In the workspace, select **Import \> Report, Paginated Report or Workbook \> From this computer**.
 
-1. Enter +++**Store+++ **for the name of your entity type and select **Add Entity Type**.
+![](./media/image39.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image48.png)
+2.  Browse to **C:\LabFiles\Lab1**, select **SalesReport.pbix**, and then select **Open**.
 
-1. The *Store* entity type is added to the configuration canvas, and the **Entity type configuration** pane is visible.
+![](./media/image40.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image49.png)
+3.  Verify that the **SalesReport** report and a **SalesReport** semantic model with the same name appear in the workspace.
 
-1. On the configuration canvas, select **...** next to the entity name and select **Bind data**.
+![](./media/image41.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image50.png)
+## Exercise 2: Build the ontology
 
-1. Select **Add data binding \> Lakehouse table**.
+In this exercise, you create the ontology item and its **entity types**. An entity type represents a type of business object. You create its **properties** by binding them to columns in a data source. You also use **inheritance**: a child entity type (for example, *Store*) inherits all the properties of its parent (*Location*).
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image51.png)
+### Task 1: Create the ontology item
 
-1. Next, choose your data source.Select the **IQ_Lakehouse** lakehouse and select **Next**.
+1.  In the workspace, select **+ New item**. Search for and select **Ontology (preview)**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image52.png)
+![](./media/image42.png)
 
-1. Select the **dimstore** table and select **Select**.
+2.  In the **New Ontology** dialog, enter +++RetailSalesOntology+++ as the **Name**, keep your workspace as the **Location**, and then select **Create**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image53.png)
+![](./media/image43.png)
 
-1. Fields from the source table populate the data binding configuration. Observe the sections of the configuration page:
+**Tip:** Ontology names must begin with a letter and can contain only letters, numbers, and underscores. Don't use spaces or dashes.
 
+**Important:** If Fabric can't create the ontology item, ask your administrator to verify that the required tenant settings are enabled.
 
-    - **Entity type key**: Identifies the field (or fields) that can be used to uniquely identify each record of ingested data.
+3.  The ontology opens on the configuration canvas.
 
-    - **Binding selection**: Identifies the source table that holds the data for the binding.
+![](./media/image44.png)
 
-    - **Entity type key mapping**: Identifies the column(s) in the source data table that map to the entity type key property. You can select string and integer columns from your source data as the entity type key. Together, the columns you select uniquely identify a record.
+### Task 2: Create the Location entity type
 
-    - **Properties**: Lists the columns from the source data that will be represented as properties on the *Store* entity type. The **Source column** side populates automatically with the columns from the *dimstore* table, and the **Property name** side lists their corresponding property names on the *Store* entity type within ontology. For this tutorial, keep the default property names.
+1.  On the ribbon, select **+ Add entity type**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image54.png)
+![](./media/image45.png)
 
+2.  Enter +++Location+++ as the **Entity type name**, and then select **Add Entity Type**.
 
-1. Select **Define entity type key** at the top of the configuration.
+![](./media/image46.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image55.png)
+3.  The **Location** entity type is added to the canvas and to the **Explorer**.
 
-1. Select **StoreId** from the property list and select **Save**.
+![](./media/image47.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image56.png)
+4.  On the canvas, select **...** next to **Location**, and then select **Bind data**.
 
-1. **Save** the data binding.
+![](./media/image48.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image57.png)
+5.  Under **Add a data source**, select **Add**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image58.png)
+![](./media/image49.png)
 
-1. Confirm that the entity type updated successfully, then select **Cancel** to close the configuration options.
+6.  In the **OneLake catalog**, expand **IQ_Lakehouse**, select the **dimlocations** table, and then select **Select table**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image59.png)
+![](./media/image50.png)
 
-1. You see the **Configure** page of the entity type details. This page surfaces important information about the entity type, including its properties and data bindings. View your configured data bindings.
+7.  Review the source. **dimlocations** is set as the **Primary source**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image60.png)
+![](./media/image51.png)
 
-1. Select **Home** to return to the configuration canvas and add new entity types.
+8.  Select **Entity type properties**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image61.png)
+![](./media/image52.png)
 
+9.  The columns of the **dimlocations** table are populated as proposed properties (**LocationId**, **LocationType**, **Name**, **Region**, **City**, and more). Without making any changes, select **Create**.
 
-### Add other entity types (Products, SaleEvent)
+![](./media/image53.png)
 
-1. Follow the same steps that you used for the **Store **entity type to create the entity types described in the following table. Each entity has a static data binding with the default columns from its source table.
+10. When **Entity type updated successfully** appears, select **Cancel** to close the binding page.
 
-    | Entity Type Name | Source Table in IQ_Lakehouse | Entity Type Key |
-    |------------------|------------------------------|-----------------|
-    | +++Products+++<br><br>**Note:** Use the plural form **Products** to avoid conflict with the GQL reserved word **PRODUCT**. | **dimproducts** | **ProductId** |
-    | +++SaleEvent+++ | **factsales** | **SaleId** |
+![](./media/image54.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image62.png)
+11. The **Configure** page of the entity type opens, showing its properties and their data source.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image63.png)
+![](./media/image55.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image64.png)
+### Task 3: Create the Store entity type (inherits from Location)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image65.png)
+1.  Select **Home** to return to the configuration canvas.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image66.png)
+![](./media/image56.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image67.png)
+2.  On the ribbon, select **+ Add entity type**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image68.png)
+![](./media/image57.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image69.png)
+3.  Enter +++Store+++ as the **Entity type name**. Expand **Additional configuration**, set **Choose entity to inherit from (optional)** to **Location**, and then select **Add Entity Type**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image70.png)
+![](./media/image58.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image71.png)
+4.  The **Store** entity type appears on the canvas.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image72.png)
+![](./media/image59.png)
 
-1. Select **Home** to return to the configuration canvas and add **SaleEvent** entity types.
+5.  With **Store** selected in the **Explorer**, select **View Entity Type details**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image73.png)
+![](./media/image60.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image74.png)
+6.  On the **Configure** tab, notice that **Store** already has properties. They are inherited from **Location**, but their **Data source** is **Unbound**.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image75.png)
+![](./media/image61.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image76.png)
+7.  Select **Manage property bindings \> Add binding and properties**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image77.png)
+![](./media/image62.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image78.png)
+8.  Select **Add**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image79.png)
+![](./media/image63.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image80.png)
+9.  Expand **IQ_Lakehouse**, select **dimlocations**, and then select **Select table**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image81.png)
+![](./media/image64.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image82.png)
+10. Select **Entity type properties**, verify that each property has a source column, and then select **Create**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image83.png)
+![](./media/image65.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image84.png)
+11. When **Entity type updated successfully** appears, select **Cancel**.
 
-1. When you're done, you see these entity types listed in the **Entity Types** pane.
+![](./media/image66.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image85.png)
+**Note:** **Store** and **Distribution Center** both use the **dimlocations** table. The **LocationType** column (STORE or DC) tells them apart. You document this in the entity descriptions in Exercise 4.
 
+### Task 4: Create the remaining entity types
 
-## Task 3: Create relationship types
+Create the following entity types with the same steps. For each one, bind the listed table and keep all the source columns as properties.
 
-Next, create relationship types between the entity types to represent contextual connections in your data.
+| **Entity type name**    | **Inherits from** | **Data source table**                     |
+|-------------------------|-------------------|-------------------------------------------|
+| Distribution Center     | Location          | IQ_Lakehouse \> dimlocations              |
+| Product                 |                   | IQ_Lakehouse \> dimproducts               |
+| Frozen Product          | Product           | IQ_Lakehouse \> dimproducts               |
+| Perishable Product      | Product           | IQ_Lakehouse \> dimproducts               |
+| Inventory               |                   | IQ_Lakehouse \> fact_inventory_positions  |
+| Supplier                |                   | IQ_Lakehouse \> dimsuppliers              |
+| Shipment                |                   | IQ_Lakehouse \> factshipments             |
+| Refrigeration Unit      |                   | IQ_Lakehouse \> dim_refrigeration_units   |
+| Refrigeration Telemetry |                   | TelemetryDataEH \> RefrigerationTelemetry |
 
-### SaleEvent from Store
+The following steps show the first few as examples.
 
-1. Select the **SaleEvent** entity type from the Explorer.
+1.  **Distribution Center:** Select **Home \> + Add entity type**. Enter +++Distribution Center+++, expand **Additional configuration**, select **Location** as the parent, and select **Add Entity Type**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image86.png)
+![](./media/image67.png)
 
-1. Select **Add relationship** from the menu ribbon.
+![](./media/image68.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image87.png)
+2.  Select **...** next to **Distribution Center \> Bind data**, select **Add**, select **IQ_Lakehouse \> dimlocations**, and select **Select table**.
 
-1. Enter the following relationship type details and select **Add relationship type**.
+![](./media/image69.png)
 
+![](./media/image70.png)
 
-    - **Relationship type name**: +++from+++
+![](./media/image71.png)
 
-    - **Source entity type**: **SaleEvent**
+3.  Select **Entity type properties \> Create**, and when **Entity type updated successfully** appears, select **Cancel**. The **Configure** page shows the bound properties.
 
-    - **Target entity type**: **Store**
+![](./media/image72.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image88.png)
+![](./media/image73.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image89.png)
+![](./media/image74.png)
 
+4.  **Product:** Select **Home \> + Add entity type**, enter +++Product+++, and select **Add Entity Type**.
 
-1. The relationship is added to the semantic canvas. Select it to open the relationship details configuration. Observe the sections of the configuration page:
+![](./media/image75.png)
 
+**Note:** Use **Product** (or a plural, *Products*) as written here. Avoid entity type names that are reserved words in GQL, the graph query language, such as **ORDER**.
 
-    - **Origin entity type**: Lists details of the origin entity (**SaleEvent** in this case).
+5.  Select **... \> Bind data \> Add**, select **IQ_Lakehouse \> dimproducts**, select **Select table**, then **Entity type properties \> Create**, and then **Cancel**.
 
-    - **Relationship type**: Sets details of the relationship type.
+![](./media/image76.png)
 
-    - **Target entity type**: Lists details of the target entity (**Store**in this case).
+![](./media/image77.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image90.png)
+![](./media/image78.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image91.png)
+6.  **Frozen Product:** Select **Home \> + Add entity type**, enter +++Frozen Product+++, set **Product** as the parent, and select **Add Entity Type**. Bind it to **IQ_Lakehouse \> dimproducts** in the same way.
 
+![](./media/image79.png)
 
-1. In the middle section, enter the following details.
+![](./media/image80.png)
 
-1. **Mapping table**: **Browse available sources** and select the **factsales** table. This table in the source data can link *Store* and *SaleEvent* entities together, because it contains identifying information for both entity types. Each row in this table references a store and a sale event by ID.
+7.  Create **Perishable Product** (parent **Product**), **Inventory**, **Supplier**, **Shipment**, and **Refrigeration Unit** in the same way, using the tables in the table above.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image92.png)
+8.  **Refrigeration Telemetry:** Select **Home \> + Add entity type**, enter +++Refrigeration Telemetry+++, and select **Add Entity Type**.
 
-1. **Matched SaleEvent: SaleId**: Select **SaleId**. This setting specifies the column in the relationship source data table whose values match the key property defined on the *SaleEvent* entity. In this case, the relationship data source and the entity data source both use the *factsales* table, so you're selecting the same column (SaleId).
+![](./media/image81.png)
 
-1. **Matched Store: StoreId**: Select **StoreId**. This setting specifies the column in the relationship source data table (*factsales \>* StoreId) whose values match the key property defined on the *Store* entity (*dimstore \>* StoreId). In the tutorial data, the column name is the same (StoreId) in both tables.
+9.  Select **... \> Bind data \> Add**. In the **OneLake catalog**, expand **TelemetryDataEH \> TelemetryDataEH** (KQL database), select the **RefrigerationTelemetry** table, and select **Select table**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image93.png)
+![](./media/image82.png)
 
-    >[!Important] Make sure to select the correct **Matched** columns that match the entity type key properties.
+**Note:** This entity type uses the **eventhouse** table, not a lakehouse table, as its data source.
 
-1. **Save** the relationship type. Confirm that the relationship type updated successfully, then select **Cancel** to close the configuration options.
+10. Select **Entity type properties**, review the properties (**TelemetryId**, **UnitId**, **Timestamp**, **TemperatureC**, **HumidityPct**, **DoorOpen**, and more), select **Create**, and then **Cancel**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image94.png)
+![](./media/image83.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image95.png)
+11. **Checkpoint:** Select **Home**. The **Explorer** lists 11 entity types: **Location**, **Store**, **Distribution Center**, **Product**, **Frozen Product**, **Perishable Product**, **Inventory**, **Supplier**, **Shipment**, **Refrigeration Unit**, and **Refrigeration Telemetry**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image96.png)
+![](./media/image84.png)
 
-    > Now the first relationship is created, and bound to data in your
-    > source table. Continue to the next section to create another
-    > relationship type.
+### Task 5: Add the Sale entity type with the Ontology agent
 
+The **Ontology agent** can also *build* the ontology. In this task, you use it to create a **Sale** entity type bound to the **SalesReport** semantic model.
 
-### **SaleEvent sold Products**
+1.  On the ribbon, select **Ontology agent**. The agent opens in a pane on the right, in **Plan** mode.
 
-1. Select **Home** to return to the configuration canvas where you can add new entity types.
+![](./media/image85.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image97.png)
+**Note:** In **Plan** mode, the agent can query and explore the ontology and propose changes, but it doesn't change anything. In **Act** mode, it applies changes.
 
-1. Follow the same steps that you used for the first relationship type to create a second relationship from the **SaleEvent **entity type that has the details described in the following table.
+2.  In the **Say something** box, enter the following prompt and select **Send**:
 
-    | Relationship Type Name | Origin Entity Type | Target Entity Type | Mapping Table | Matched SaleEvent: SaleId | Matched Products: ProductId |
-    |------------------------|-------------------|-------------------|---------------|--------------------------|----------------------------|
-    | `sold` | `SaleEvent` | `Products` | `factsales` | `SaleId` | `ProductId` |
+    +++Create a new entity type called Sale, bound to data in the Sales table from the SalesReport semantic model inside this workspace.+++
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image98.png)
+![](./media/image86.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image99.png)
+3.  The agent creates a plan for the new entity type. Review the **Enrichment added** summary.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image100.png)
+![](./media/image87.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image101.png)
+4.  Switch the toggle to **Act**, enter +++Apply the entity type plan+++, and then select **Send**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image102.png)
+![](./media/image88.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image103.png)
+5.  Wait while the agent generates the ontology changes.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image104.png)
+![](./media/image89.png)
 
+6.  The agent adds the **Sale** entity type to the canvas and reports the result.
 
-# Exercise 3: Enrich the ontology with additional data
+![](./media/image90.png)
 
-In this exercise, you enrich your ontology by adding a new ***Freezer* **entity type. This entity type adds more domain context and introduces properties for time series data, which reflects live operational information.
+**Note:** The agent may report that the apply was *partial* because of conflicts with other draft definitions. As long as **Sale exists now**, you can continue.
 
->[!Note] For both static and time series data, you can create properties without binding data and bind data later, or create properties and bind data to them in a single step. This article demonstrates both approaches.
+7.  Select **Sale** in the **Explorer**, and then select **View Entity Type details**.
 
-Finally, you create a new relationship type to represent the connection between a store and its freezers.
+![](./media/image91.png)
 
-## Task 1: Create Freezer entity type and add properties
+8.  Verify that the properties (**Channel**, **CostAmount**, **NetSalesAmount**, **ProductId**, **SaleId**, and more) are bound to the **Sales** table of the semantic model.
 
-Follow these steps to create the *Freezer* entity type and add properties to it. The properties aren't bound to data yet.
+![](./media/image92.png)
 
-1. Select **Add entity type** from the top ribbon. Enter +++Freezer*+++* for the name of your entity type and select **Add Entity Type**.
+9.  Scroll down to **Metrics** and verify that two metrics, **Gross Margin %** and **Net Sales**, were added from the DAX measures of the semantic model.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image105.png)
+![](./media/image93.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image106.png)
+## Exercise 3: Create relationship types
 
-1. With the Freezer entity type selected in the **Explorer**, select **View entity type details** from the top ribbon.
+A **relationship type** connects an origin entity type to a target entity type. In this lab, you link them by properties: the **origin property** and the **target property** must hold the same values.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image107.png)
+### Task 1: Create Store operates Refrigeration Unit
 
-1. The **Configure** page of the entity type details opens. This page surfaces important information about the entity type, including its properties and data bindings.
+1.  On the canvas, select **...** next to an entity type and select **Add relationship type** (or select **Add relationship** on the ribbon).
 
-    Expand **Manage property bindings** and select **Add properties**.
+![](./media/image94.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image108.png)
+2.  Enter the following details, and then select **Create**:
 
-1. Add the following properties and select **Save**.
+    - **Relationship type name**: +++operates+++
 
-    | Name | Property Type |
-    |------|---------------|
-    | `FreezerId` | `String` |
-    | `Model` | `String` |
-    | `minSafeTempC` | `Double` |
-    | `StoreId` | `String` |
+    - **Origin entity type**: **Store**
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image109.png)
+    - **Target entity type**: **Refrigeration Unit**
 
-    >[!Note] Property names must be unique across all entity types.
+![](./media/image95.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image110.png)
+3.  The relationship appears on the canvas between **Store** and **Refrigeration Unit**.
 
-1. The properties are added to the **Configure** page, unbound to any data source.
+![](./media/image96.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image111.png)
+4.  Select the **operates** relationship to open its configuration.
 
+![](./media/image97.png)
 
-## Task 2: Bind static data to properties
+5.  The page has three sections: the **Origin entity type** (Store), the **Relationship** (operates), and the **Target entity type** (Refrigeration Unit). Leave **Use mapping table?** set to **Off**.
 
-Next, bind static data to the properties you created on the *Freezer* entity type.
+![](./media/image98.png)
 
-1. Expand **Manage property bindings** and select **Add binding and properties**.
+6.  Under the origin entity type, in **Property**, select **LocationId**. Under the target entity type, in **Property**, select **StoreId**. Select **Save**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image112.png)
+![](./media/image99.png)
 
-1. Select **Add data binding \> Lakehouse table**.
+**Note:** These settings mean that **LocationId** on a Store matches **StoreId** on a Refrigeration Unit.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image113.png)
+7.  When **Successfully updated the relationship type** appears, select **Cancel**.
 
-1. Choose your data source.
+![](./media/image100.png)
 
+8.  The **Configure** page of **Store** shows the new relationship in the **Relationships** section.
 
-    - Select the **IQ_Lakehouse** lakehouse and select **Next**.
+![](./media/image101.png)
 
-    - Select the **freezer** table and **Select**.
+### Task 2: Create the remaining relationship types
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image114.png)
+1.  Select **Home**, and then select **Add relationship**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image115.png)
+![](./media/image102.png)
 
+2.  Create **deliversTo**: origin **Shipment**, target **Store**, and select **Create**.
 
-1. Fields from the source table populate the data binding configuration. Observe the sections of the configuration page:
+![](./media/image103.png)
 
+![](./media/image104.png)
 
-    - **Entity type key**: Identifies the field (or fields) that can be used to uniquely identify each record of ingested data.
+3.  Select the **deliversTo** relationship, set the origin **Property** to **ToStoreId** and the target **Property** to **LocationId**, select **Save**, and then **Cancel**.
 
-    - **Binding selection**: Identifies the source table that holds the data for the binding.
+![](./media/image105.png)
 
-    - **Entity type key mapping**: Identifies the column(s) in the source data table that map to the entity type key property. You can select string and integer columns from your source data as the entity type key. Together, the columns you select uniquely identify a record.
+4.  Create the remaining relationship types in the same way. The table lists all the relationship types, including **operates** and **deliversTo**, which you already created:
 
-    - **Properties**: Lists the columns from the source data and corresponding properties on the +++Freezer+++ entity type. The **Source column** side populates automatically with the columns from the **freezer** table, and the **Property name** side lists their corresponding property names on the **Freezer** entity type within ontology. For this tutorial, keep the default property names.
+| **Relationship type name** | **Origin entity type (Property)** | **Target entity type (Property)** |
+|----------------------------|-----------------------------------|-----------------------------------|
+| operates                   | Store (LocationId)                | Refrigeration Unit (StoreId)      |
+| deliversTo                 | Shipment (ToStoreId)              | Store (LocationId)                |
+| occursAt                   | Sale (StoreId)                    | Store (LocationId)                |
+| stockedAt                  | Inventory (StoreId)               | Store (LocationId)                |
+| originatesAt               | Shipment (FromLocationId)         | Distribution Center (LocationId)  |
+| forProduct                 | Sale (ProductId)                  | Product (ProductId)               |
+| stockedAt                  | Product (ProductId)               | Inventory (ProductId)             |
+| suppliedBy                 | Product (SupplierId)              | Supplier (SupplierId)             |
+| contains                   | Shipment (ProductId)              | Product (ProductId)               |
+| hasTelemetryReading        | Refrigeration Unit (UnitId)       | Refrigeration Telemetry (UnitId)  |
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image116.png)
+5.  **Checkpoint:** Select **Home**. The canvas shows the relationships connecting the entity types.
 
+![](./media/image106.png)
 
-1. Select **Define entity type key** at the top of the configuration. Select FreezerId from the property list and select **Save**.
+**Important:** Select the correct properties. If the origin and target properties hold different values, the relationship is created but finds no matches.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image117.png)
+## Exercise 4: Enrich the ontology
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image118.png)
+Metadata and rules give AI agents the business context they need to interpret the data correctly. In this exercise, you add descriptions to entity types, properties, and relationship types, and you define business rules.
 
-1. **Save** the data binding. Confirm that the entity type updated successfully, then select **Cancel** to close the configuration options.
+### Task 1: Add entity type metadata
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image119.png)
+1.  Select **Store** in the **Explorer**, and then select **View Entity Type details**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image120.png)
+![](./media/image107.png)
 
+2.  Scroll to **Entity metadata**. In **Description**, enter the following text, and then select **Update**:
 
-## Task 3: Bind time series data to additional properties
+    +++Filtered locations binding where LocationType = STORE; priorityDefinition=Tier 1 stores require same-day response.+++
 
-Next, add time series data on the **Freezer **entity, by creating new properties and binding time series data to them in a single data binding operation.
+![](./media/image108.png)
 
-1. In the **Configure** page, expand **Manage property bindings** and select **Add binding and properties** again to reopen the binding configuration.
+3.  Verify the description, and then select **Home**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image121.png)
+![](./media/image109.png)
 
-1. Under **Binding selection**, expand **Add data binding** and select **Eventhouse table or materialized view**.
+4.  Add descriptions to the following entity types in the same way (select the entity type, select **View Entity Type details**, enter the **Description**, and select **Update**):
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image122.png)
+| **Entity type**     | **Description**                                               |
+|---------------------|---------------------------------------------------------------|
+| Distribution Center | +++Filtered locations binding where LocationType = DC.+++     |
+| Frozen Product      | +++Filtered items binding where StorageClass = FROZEN.+++     |
+| Perishable Product  | +++Filtered items binding where StorageClass = PERISHABLE.+++ |
 
-1. Choose your data source.
+![](./media/image110.png)
 
-    1. Select the **TelemetryDataEH **eventhouse and select **Add**.
+![](./media/image111.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image123.png)
+![](./media/image112.png)
 
-1. Select the **FreezerTelemetry **table and **Add**.
+![](./media/image113.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image124.png)
+![](./media/image114.png)
 
-1. A **Timeseries data** section appears in the configuration. For **Timestamp column**, select timestamp
+5.  Open **Inventory**. Under **Additional metadata**, select **+** and add the following key-value pairs, and then select **Update**:
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image125.png)
+    - **On-Shelf Availability %**: +++On-shelf availability percentage is calculated by dividing the total ShelfAvailableUnits by the total ShelfCapacityUnits. If total ShelfCapacityUnits is zero, the result is blank to avoid division by zero.+++
 
-1. Scroll down to the **Properties** section, where the **StoreId **shows an error because it is already bound in the static data binding. Use the trash icon to delete the duplicated property.
+    - **Low On-Shelf Availability**: +++On-Shelf Availability % less than 95+++
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image126.png)
+![](./media/image115.png)
 
-1. **Save** the data binding. Confirm that the entity type updated successfully, then select **Cancel** to close the configuration options.
+6.  Open **Sale**. Review the **Description** and **Synonyms** that were added from the semantic model. No changes are needed.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image127.png)
+![](./media/image116.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image128.png)
+### Task 2: Add property metadata
 
-1. Back in the **Configure** page for *Freezer*, notice that there are now more entity type properties, and the new ones are bound to the *FreezerTelemetry* data source.
+1.  In the **Explorer**, select **...** next to **Product**, and then select **Bind data**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image129.png)
+![](./media/image117.png)
 
-    Now the *Freezer* entity has two data bindings: one with static data from the *freezer* lakehouse table and one with streaming data from the *FreezerTelemetry* eventhouse table.
+2.  Select **Entity type properties**.
 
+![](./media/image118.png)
 
-## Task 4: Add relationship type
+3.  In the **ProductId** row, select **Metadata**.
 
-Finally, create a new relationship type to represent the connection between a store and its freezers.
+![](./media/image119.png)
 
-### Create Store operates Freezer
+4.  In **Description**, enter +++Enterprise product identifier; not a supplier SKU or UPC.+++ and select **Update**.
 
-1. In the **Configure** page, expand Manage relationships and select **Add new relationship**.
+![](./media/image120.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image130.png)
+5.  Select **Save**, and when **Entity type updated successfully** appears, select **Cancel**.
 
-1. Enter the following relationship type details and select **Add relationship type**.
+![](./media/image121.png)
 
-    1. **Relationship type name**: +++operates+++
+![](./media/image122.png)
 
-    1. **Source entity type**: **Store**
+6.  Repeat for **Refrigeration Telemetry**: in the **TemperatureC** row, select **Metadata**, enter +++Temperature in Celsius+++, select **Update**, and then **Save**.
 
-    1. **Target entity type**: **Freezer**
+![](./media/image123.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image131.png)
+![](./media/image124.png)
 
-1. The relationship is added to the **Relationships** section. Select the **operates** relationship on the canvas to open the relationship details configuration. Observe the sections of the configuration page:
+![](./media/image125.png)
 
+7.  Repeat for **Inventory**: in the **InventoryStatus** row, select **Metadata**, enter +++0 is AT_RISK and 1 is HEALTHY.+++, select **Update**, and then **Save**.
 
-    - **Origin entity type**: Lists details of the origin entity (*Store* in this case).
+![](./media/image126.png)
 
-    - **Relationship type**: Sets details of the relationship type.
+![](./media/image127.png)
 
-    - **Target entity type**: Lists details of the target entity (**Freezer** in this case).
+### Task 3: Add relationship metadata
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image132.png)
+1.  Select **Home**, select **Store**, and on the canvas select the **operates** relationship.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image133.png)
+![](./media/image128.png)
 
+![](./media/image129.png)
 
-1. In the middle section, enter the following details.
+2.  In the **Metadata** section, select **Edit**.
 
+![](./media/image130.png)
 
-    - **Mapping table**: Select the **freezer** table. This table in the source data can link **Store** and **Freezer** entities together, because it contains identifying information for both entity types. Each row in this table references a store and a freezer by ID.
+3.  In **Description**, enter +++Identifies the refrigeration equipment operating in a store.+++ and select **Update**.
 
-    - **Matched Store: StoreId**: Select **StoreId**. This setting specifies the column in the relationship source data table (*freezer \>* StoreId) whose values match the key property defined on the *Store* entity (*dimstore \>* StoreId). In the tutorial data, the column name is the same (StoreId) in both tables.
+![](./media/image131.png)
 
-    - **Matched Freezer: FreezerId**: Select **FreezerId.** This setting specifies the column in the relationship source data table whose values match the key property defined on the *Freezer* entity. In this case, the relationship data source and the entity data source both use the *freezer* table, so you're selecting the same column (FreezerId).
+4.  Select **Save**, and when **Successfully updated the relationship type** appears, select **Cancel**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image134.png)
+![](./media/image132.png)
 
-    >[!Important] Make sure to select the correct source columns that match the entity type key properties.
+![](./media/image133.png)
 
+5.  Add descriptions to the other relationship types in the same way:
 
-1. **Save** the relationship type. Confirm that the relationship type updated successfully, then select **Cancel** to close the configuration options.
+| **Relationship**                                                    | **Description**                                                                                         |
+|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| deliversTo (Shipment \> Store)                                      | Identifies the store receiving the shipment.                                                            |
+| occursAt (Sale \> Store)                                            | Identifies where the sale occurred.                                                                     |
+| stockedAt (Inventory \> Store)                                      | Represents an active store assortment and its current inventory position, not merely a historical sale. |
+| originatesAt (Shipment \> Distribution Center)                      | Identifies the distribution center sending the shipment.                                                |
+| forProduct (Sale \> Product)                                        | Identifies the item sold.                                                                               |
+| stockedAt (Product \> Inventory)                                    | The item is part of the store's active assortment and has a current inventory position there.           |
+| suppliedBy (Product \> Supplier)                                    | Identifies the supplier responsible for the items.                                                      |
+| contains (Shipment \> Product)                                      | Identifies the item being replenished.                                                                  |
+| hasTelemetryReading (Refrigeration Unit \> Refrigeration Telemetry) | Identifies the sensor telemetry readings for refrigeration units.                                           |
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image135.png)
+### Task 4: Add business rules
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image136.png)
+**Rules** describe in natural language what must, must not, or should be true in the business. Words that match entity types are linked to the ontology.
 
-1. You see the **Configure** page for the entity, where the updated relationship remains visible in the **Relationships** section.
+1.  Select **Home**, and in the **Explorer** select **Rules**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image137.png)
+![](./media/image134.png)
 
+2.  Select **+ Create rule**.
 
-# Exercise 4: **View the ontology**
+![](./media/image135.png)
 
-In this exercise, explore your ontology by using the preview experience. Inspect entity instances that instantiate your entity types with data, and explore graph-shaped context across sales and device streaming data.
+3.  Enter +++Cold-chain exception+++ as the **Rule name**, and select **Create**.
 
-## Task 1: **View instance list and static data**
+![](./media/image136.png)
 
-When you bound data to your entity types in previous tutorial steps, ontology automatically created instances of those entities that are tied to the source data rows. In this section, you use the preview experience to view those entity instances.
+4.  In **Rule definition**, enter the following text. Under **Linked ontology concepts**, select **Add concept** and add **Frozen Product** and **Refrigeration Unit**. Select **Save**.
 
-1. Start in the Home configuration canvas of ontology. Select the **SaleEvent **entity type, and **View Entity Type details** from the top ribbon.
+    +++A frozen product has a cold-chain exception when the temperature of the refrigeration unit storing it remains above the product's maximum storage temperature for more than 20 minutes.+++
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image138.png)
+![](./media/image137.png)
 
-1. Open the **Instances** tab. Verify that it shows six entity instances with data populated from the **factsales **lakehouse table, like revenue and unit counts.
+5.  When **Rule saved** appears, select **Cancel**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image139.png)
+![](./media/image138.png)
 
+6.  Select **New rule**, enter +++Inventory at risk+++, and select **Create**.
 
-## Task 2: View time series data
+![](./media/image139.png)
 
-1. In the top left corner of the page, use the selector next to the entity type name to switch to the **Freezer** entity type.
+![](./media/image140.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image140.png)
+7.  Enter the definition +++A store inventory position is at risk when projected on-hand inventory falls below safety stock before the next scheduled delivery+++, link **Store** and **Inventory**, select **Save**, and then **Cancel**.
 
-1. Open the **Overview** tab. The tab loads with empty charts, because the default time range of **Last 30 days** doesn't include any data.
+![](./media/image141.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image141.png)
+8.  Select **New rule**, enter +++Late replenishment+++, and select **Create**.
 
-1. Update the time range from the default of **Last 30 days** to a custom date range that begins on **Fri Aug 01 2025 at 12:00 AM,** ends on **Mon Aug 04 2025** *at* **12:00 AM**, and has a **Time granularity** of **5 minutes**.
+![](./media/image142.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image142.png)
+9.  Enter the definition +++A replenishment shipment is late when its estimated arrival is more than four hours after its scheduled arrival.+++, link **Shipment**, select **Save**, and then **Cancel**.
 
-1. Observe the time series data that's now visible from several **Freezer **entity instances in the time window you selected.
+![](./media/image143.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image143.png)
+10. Verify that the **Business rules** list shows the three rules.
 
+![](./media/image144.png)
 
-## Task 3: **View ontology graph**
+## Exercise 5: Explore the ontology
 
-The **Overview** tab also contains a **Relationship graph**, which you use to visualize your ontology in a graph of nodes and edges.
+### Task 1: Explore the canvas views and entity instances
 
-1. Use the entity type selector to switch to the **SaleEvent** entity type. In the **Relationship graph** tile, select **Expand**.
+1.  Select **Home** and select **Product**. On the top right of the canvas, select **Full ontology** to see all entity types and relationships.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image144.png)
+![](./media/image145.png)
 
-1. he expanded graph view opens. Observe the details of the relationships from the **SaleEvent **entity type to +++Products+++ and **Store.**
+2.  Select **Lineage** to see the inheritance structure: **Product** has two derived types, **Frozen Product** and **Perishable Product**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image145.png)
+![](./media/image146.png)
 
-1. Use the entity type selector to switch to the **Store **entity type. +++Expand+++ its **relationship graph.**
+3.  Select **Relationship** to see only the relationships of the selected entity type.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image146.png)
+![](./media/image147.png)
 
-1. In the graph, observe the relationships that **Store** has with **Freezer **and **SaleEvent**. Then, select **Run query** in the query builder ribbon. This action runs the default query and shows a graph of entity instances alongside their connections
+4.  With **Product** selected, select **View Entity Type details**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image147.png)
+![](./media/image148.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image148.png)
+5.  Select the **Instances** tab. The list shows the product records populated from the **dimproducts** table.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image149.png)
+![](./media/image149.png)
 
+### Task 2: Define entity type keys
 
-## Task 4: Query graph instances
+An **entity type key** uniquely identifies each record of an entity type. All the entity types in the graph need a key.
 
-In the relationship graph view, you can query your ontology for entity instances that meet certain criteria. Use the **Query builder** filters in the top ribbon to craft queries.
+1.  Select **Location** and select **View Entity Type details**.
 
-![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image150.png)
+![](./media/image150.png)
 
-First, craft this query: **Show all freezers that are operated in the Paris store.**
+2.  Next to **Entity type key**, select **Define entity type key**.
 
-1. In the *Store* entity's relationship graph, select **Add filter \> Store \> StoreId** from the query builder ribbon. Set the filter for **StoreId = S-PAR-01**. This value is the store ID for the Paris store.
+![](./media/image151.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image151.png)
+3.  Select **LocationId**, and then select **Save**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/imga2.png)
+![](./media/image152.png)
 
-1. In the **Components** section, uncheck *SaleEvent* so that the only checked fields are **Nodes \> Store**, **Nodes \> Freezer**, and **Edges \> operates**.
+4.  Verify that the **Entity type key** shows **LocationId**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image153.png)
+![](./media/image153.png)
 
-1. Select **Run query** and verify that the instance graph shows two freezers connected to the **Paris** store.
+5.  Repeat for each of the other entity types. For example, for **Store**, select **LocationId**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image154.png)
+![](./media/image154.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image155.png)
+| **Entity type**                             | **Key**                          |
+|---------------------------------------------|----------------------------------|
+| Location, Store, Distribution Center        | LocationId                       |
+| Product, Frozen Product, Perishable Product | ProductId                        |
+| Inventory                                   | the unique ID column of **fact_inventory_positions** |
+| Supplier                                    | SupplierId                       |
+| Shipment                                    | the unique ID column of **factshipments** |
+| Refrigeration Unit                          | UnitId                           |
 
-1. Select **Clear query** to clear the query results.
+**Note:** Skip **Sale** and **Refrigeration Telemetry**; they aren't included in the graph in this lab.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image156.png)
+### Task 3: Materialize the graph
 
-    Next, craft this query: *Show all stores that have made a sale with a revenue greater than 150.*
+1.  Select **Home**, and then select **Manage graph** on the ribbon.
 
-1. Select **Add a node** and add a node for **SaleEvent.**
+![](./media/image155.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image157.png)
+2.  The **Configure Graph** page opens with **Use the entire Ontology** set to **Yes**. All entity types are selected except **Sale** and **Refrigeration_Telemetry** (shown in gray in the preview).
 
-1. In the **Components** section, check the boxes next to **Nodes \> Store** and **Edges \> from** to add them to the graph.
+![](./media/image156.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/imga3.png)
+![](./media/image157.png)
 
-1. From the query builder ribbon, select **Add filter \> SaleEvent \> RevenueUSD**. Set the filter for +++**RevenueUSD \> 150+++.**
+![](./media/image158.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image159.png)
+**Important:** Materializing the **entire** ontology can take **more than one hour**. To finish the lab in time, build the graph from a smaller set of entity types, as described in the next step. A smaller graph is created in a few minutes and is enough for the exploration in this lab.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image160.png)
+3.  Set **Use the entire Ontology** to **No**. In the **Entities** list, select only **Store**, **Product**, **Shipment**, and **Supplier**, and clear all the others. Verify that only these entity types are highlighted in blue in the **Preview**, and then select **Continue**.
 
-1. Select **Run query** and verify that the instance graph shows two stores that meet the filter for their connected sale events. You can also select the nodes in the graph to get details of the specific sale events
+![](./media/image162.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image161.png)
+**Note:** The screenshot shows the selection being made. Make sure that **Shipment** and **Supplier** are also selected, because the next task uses the relationships between **Shipment**, **Store**, and **Product** and runs a path query from **Store** to **Supplier**. Relationships are included only when both of their entity types are selected.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image162.png)
+**Tip:** If you have more time, you can keep **Use the entire Ontology** set to **Yes** to materialize all entity types except **Sale** and **Refrigeration_Telemetry**. Expect this to take more than an hour.
 
-    This process allows you to inspect the paths that connect operational issues (like rising freezer temperature at certain stores) to business outcomes (sales).
+4.  On the **Projection summary** page, review the selected entities, and then select **Materialize**.
 
+![](./media/image159.png)
 
-# Exercise 5: **Consume ontology from agents**
+5.  A notification **Creating graph model** appears. Wait until the graph model is created.
 
-Ontology (preview) integrates with [Fabric data agent (preview)](https://learn.microsoft.com/en-us/fabric/data-science/concept-data-agent) to let you ask questions in natural language, and get answers grounded in the ontology's definitions and bindings.
+![](./media/image160.png)
 
-## Task 1: Create data agent with ontology (preview) source
+![](./media/image161.png)
 
-Follow these steps to create a new data agent that connects to your ontology (preview) item.
+### Task 4: Explore the graph
 
-1. Now, click on **Fabric IQ Ontology@lab.LabInstance.Id** on the left-sided navigation pane.
+1.  On the ribbon, select **Explore graph**. This button is available after the graph is materialized.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image163.png)
+![](./media/image163.png)
 
-1. In the **Fabric** home page, select **+New item.** In the Filter by item type search box, enter +++data agent+++ and select the Data agent
+2.  The graph queryset opens. On the right side, select the puzzle piece icon to expand the **Components** pane.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image164.png)
+![](./media/image164.png)
 
-1. Enter +++RetailOntologyAgent+++ as the Data agent name and select **Create**.
+![](./media/image165.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image165.png)
+3.  The **Components** pane lists the **Nodes** and **Edges** available in the graph.
 
-1. In **RetailOntologyAgent** page, select **Add a data source**
+![](./media/image166.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image166.png)
+4.  Under **Nodes**, select **Store**, **Product**, and **Shipment**. Under **Edges**, select **Shipment_Store** and **Shipment_Product**. The nodes and edges are added to the canvas.
 
-1. In the OneLake catalog tab, select the **RetailSalesOntology** Ontology and select **Add.**
+![](./media/image167.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image167.png)
+5.  On the ribbon, select **Path query** and confirm **Switch** when prompted. Enter the following details to find the paths within two hops between the Seattle store and the supplier Cascade Fresh Products, and then select **Run**:
 
-    > When the agent is ready, it opens.
+    - **Start node**: **Store**
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image168.png)
+    - **End node**: **Supplier**
 
+    - **Filter start node**: **City** = +++Seattle+++
 
-## Task 2: Provide agent instructions
+    - **Filter end node**: **SupplierName** = +++Cascade Fresh Products+++
 
->[!Note] This step is added in response to a known issue affecting aggregation in queries.
+    - **Max hops**: **2**
 
-> Next, add a custom instruction to the agent.
+![](./media/image168.png)
 
-1. Select **Agent instructions** from the menu ribbon.
+6.  Review the result in the query canvas and the **Results** pane.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image169.png)
+![](./media/image169.png)
 
-1. At the bottom of the input box, add +++Support group by in
-    GQL+++. This instruction enables better aggregation across
-    ontology data.
+## Exercise 6: Ask questions with the Ontology agent
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image170.png)
+The **Ontology agent (preview)** is an AI-powered Copilot that helps you build and use ontologies in natural language. It reasons over the ontology, including its metadata and rules, and queries the bound data sources to answer questions.
 
-1. The instruction is applied automatically. Optionally, close the **Agent instructions** tab.
+### Task 1: Ask questions in natural language
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image171.png)
+1.  Select **Home**, and on the ribbon select **Ontology agent**.
 
+![](./media/image170.png)
 
-## Task 3: Query agent with natural language
+2.  The agent opens in **Plan** mode in a pane on the right.
 
-> Next, explore your ontology with natural language questions.
+![](./media/image171.png)
 
-1. Enter the following text and click on the **Submit icon** as shown in the below image.
+3.  Enter +++Which frozen products are stocked at Tier 1 stores in the West?+++ and select **Send**.
 
-    +++For each store, show any freezers operated by that store that ever had a humidity lower than 46 percent.+++
+![](./media/image172.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image172.png)
+4.  The agent reasons for a short time and then answers from your ontology. Expand **Reasoning** to see how it reached the answer.
 
-    ![A screenshot of a chat AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image173.png)
+![](./media/image173.png)
 
-1. Enter the following text and click on the **Submit icon** as shown in the below image.
+![](./media/image174.png)
 
-    +++What is the top product by revenue across all stores?+++
+5.  Enter +++Which of those inventory positions are below safety stock?+++ and select **Send**.
 
-    ![A screenshot of a chat AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image174.png)
+![](./media/image175.png)
 
-    ![A screenshot of a chat AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image175.png)
+6.  Review the answer, which lists the inventory positions with their on-hand quantity, safety stock, and shortfall.
 
-    > Notice that the responses reference entity types
-    > (**Store**, **Products**, **Freezer**) and their relationships, not just raw
-    > tables.
+![](./media/image176.png)
 
-    ![Screenshot of the result of a query.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image176.png)
+7.  (Optional) Explore the ontology further with these questions, or ask your own:
 
-    >[!Tip] If you see errors that say there's no data while running the example queries, wait a few minutes to give the agent more time to initialize. Then, run the queries again.
-    >
-    > Continue exploring the data agent by trying out some prompts of your
-    > own.
+    - +++Which affected stores had a qualifying refrigeration-temperature exception?+++
 
+    - +++What inbound shipments are expected for the affected products and stores?+++
 
-## Task 4: Clean up resources
+    - +++What is the on-shelf availability of frozen products for each store?+++
 
-1. Select your workspace, the **Fabric IQ Ontology@lab.LabInstance.Id** from the left-hand navigation menu. It opens the workspace item view.
+    - +++Which of these stores have low on-shelf availability?+++
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image177.png)
+    - +++Which of these stores have declining gross margin?+++
 
-1. Select the ... option under the workspace name and select **Workspace settings**.
+### Task 2: Answer the scenario question
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image178.png)
+1.  Enter the main question of the Lakeshore Retail scenario and select **Send**:
 
-1. Navigate to the bottom of the General tab and select **Remove this workspace**.
+    +++Which high-priority stores in the West have frozen products below safety stock, a recent refrigeration-temperature exception, and on-shelf availability below target? For each store, show the next inbound shipment and its expected arrival.+++
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image179.png)
+![](./media/image177.png)
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2001/media/image180.png)
+2.  Review the answer. The agent combines inventory, refrigeration telemetry, store, and shipment data through the ontology, applies the business rules and metadata (for example, the on-shelf availability target), and lists the qualifying stores with their next inbound shipment.
 
+![](./media/image178.png)
 
-### Summary
+![](./media/image179.png)
 
-This use case demonstrates how Microsoft Fabric IQ Ontology (preview) can be used to create a connected, semantic data model that represents real-world business concepts and their relationships. By combining structured lakehouse data with streaming telemetry data, the ontology provides a unified, business-friendly view of enterprise data.
+**Note:** Answers can differ between runs, because the agent decides how to interpret terms such as *recent* and *target*. The agent states its assumptions in the answer. Check important answers against the source data.
 
-Through entity definitions, data bindings, and relationship modeling, users can analyze how operational signals-such as freezer temperature or humidity-relate to business outcomes like sales and revenue. The use case also highlights how ontologies power graph exploration and natural language queries through Fabric data agents, enabling deeper insights without requiring users to understand underlying tables or schemas.
+## Exercise 7: Clean up resources
 
-Overall, this use case shows how Fabric IQ Ontology helps bridge operational data and analytics, supporting smarter decision-making across domains.
+1.  In the left navigation bar, select your workspace **Fabric IQ Ontology\<number\>**, and then select **Workspace settings**.
+
+![](./media/image180.png)
+
+2.  On the **General** tab, scroll to **Delete workspace**, and then select **Remove this workspace**. Confirm the deletion.
+
+![](./media/image181.png)
+
+3.  Verify the notification **Workspace deleted**.
+
+![](./media/image182.png)
+
+**Summary**
+
+In this lab, you used **Microsoft Fabric IQ Ontology (preview)** to build a connected, business-friendly model of Lakeshore Retail's operations. You prepared a lakehouse with static data, an eventhouse with refrigeration telemetry, and a Power BI semantic model with sales data. You created the **RetailSalesOntology** with entity types and inheritance (Location \> Store and Distribution Center, Product \> Frozen and Perishable Product), bound them to all three data sources, and used the Ontology agent to add a **Sale** entity type from the semantic model. You connected the entity types with relationship types, enriched the model with entity, property, and relationship metadata and business rules, explored it through canvas views, instances, a materialized graph, and path queries, and finally used the **Ontology agent** to answer the cross-domain scenario question in natural language, without writing a single join. This shows how an ontology bridges operational and analytical data and gives people and AI agents a shared understanding of the business.
