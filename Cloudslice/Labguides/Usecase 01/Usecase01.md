@@ -579,8 +579,8 @@ A **relationship type** connects an origin entity type to a target entity type. 
 | occursAt                   | Sale (StoreId)                    | Store (LocationId)                |
 | stockedAt                  | Inventory (StoreId)               | Store (LocationId)                |
 | originatesAt               | Shipment (FromLocationId)         | Distribution Center (LocationId)  |
-| forProduct                 | Sale (ProductId)                  | Product (ProductId)               |
-| stockedAt                  | Product (ProductId)               | Inventory (ProductId)             |
+| forProduct                 | Sale (ProductId)                  | Product (ProductName)               |
+| stockedAt                  | Product (ProductId)               | Inventory (ProductName)             |
 | suppliedBy                 | Product (SupplierId)              | Supplier (SupplierId)             |
 | contains                   | Shipment (ProductId)              | Product (ProductId)               |
 | hasTelemetryReading        | Refrigeration Unit (UnitId)       | Refrigeration Telemetry (UnitId)  |
