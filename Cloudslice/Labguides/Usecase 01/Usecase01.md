@@ -576,16 +576,15 @@ A **relationship type** connects an origin entity type to a target entity type. 
 
 | **Relationship type name** | **Origin entity type (Property)** | **Target entity type (Property)** |
 |----------------------------|-----------------------------------|-----------------------------------|
-| operates                   | Store (LocationId)                | Refrigeration Unit (StoreId)      |
-| deliversTo                 | Shipment (ToStoreId)              | Store (LocationId)                |
-| occursAt                   | Sale (StoreId)                    | Store (LocationId)                |
-| stockedAt                  | Inventory (StoreId)               | Store (LocationId)                |
-| originatesAt               | Shipment (FromLocationId)         | Distribution Center (LocationId)  |
-| forProduct                 | Sale (ProductId)                  | Product (ProductName)               |
-| stockedAt                  | Product (ProductId)               | Inventory (ProductName)             |
-| suppliedBy                 | Product (SupplierId)              | Supplier (SupplierId)             |
-| contains                   | Shipment (ProductId)              | Product (ProductId)               |
-| hasTelemetryReading        | Refrigeration Unit (UnitId)       | Refrigeration Telemetry (UnitId)  |
+| +++deliversTo+++                 | Shipment (ToStoreId)              | Store (LocationId)                |
+| +++occursAt+++                   | Sale (StoreId)                    | Store (LocationId)                |
+| +++stockedAt+++                  | Inventory (StoreId)               | Store (LocationId)                |
+| +++originatesAt+++               | Shipment (FromLocationId)         | Distribution Center (LocationId)  |
+| +++forProduct+++                 | Sale (ProductId)                  | Product (ProductName)               |
+| +++stockedAt+++                  | Product (ProductId)               | Inventory (ProductName)             |
+| +++suppliedBy+++                 | Product (SupplierId)              | Supplier (SupplierId)             |
+| +++contains+++                   | Shipment (ProductId)              | Product (ProductId)               |
+| +++hasTelemetryReading+++        | Refrigeration Unit (UnitId)       | Refrigeration Telemetry (UnitId)  |
 
 5.  **Checkpoint:** Select **Home**. The canvas shows the relationships connecting the entity types.
 
