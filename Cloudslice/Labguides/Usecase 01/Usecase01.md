@@ -190,6 +190,8 @@ In this exercise, you prepare the three data sources for the ontology: a lakehou
 
 ![](./media/image22.png)
 
+Note: If you encounter Fabric capacity issues during the lab, navigate to Fabric Capacity in the Azure portal, pause the capacity for approximately 5 minutes, and then resume it. Once the capacity is running successfully, continue with the remaining lab steps.
+
 12. In the left navigation bar, select your workspace **Fabric IQ Ontology\<number\>**.
 
 ![](./media/image23.png)
