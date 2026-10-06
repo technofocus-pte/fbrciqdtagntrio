@@ -580,8 +580,8 @@ A **relationship type** connects an origin entity type to a target entity type. 
 | +++occursAt+++                   | Sale (StoreId)                    | Store (LocationId)                |
 | +++stockedAt+++                  | Inventory (StoreId)               | Store (LocationId)                |
 | +++originatesAt+++               | Shipment (FromLocationId)         | Distribution Center (LocationId)  |
-| +++forProduct+++                 | Sale (ProductId)                  | Product (ProductName)               |
-| +++stockedAt+++                  | Product (ProductId)               | Inventory (ProductName)             |
+| +++forProduct+++                 | Sale (ProductId)                  | Product (ProductId)               |
+| +++stockedAt+++                  | Product (ProductId)               | Inventory (ProductId)             |
 | +++suppliedBy+++                 | Product (SupplierId)              | Supplier (SupplierId)             |
 | +++contains+++                   | Shipment (ProductId)              | Product (ProductId)               |
 | +++hasTelemetryReading+++        | Refrigeration Unit (UnitId)       | Refrigeration Telemetry (UnitId)  |
@@ -815,7 +815,8 @@ An **entity type key** uniquely identifies each record of an entity type. All th
 | **Entity type**                             | **Key**                          |
 |---------------------------------------------|----------------------------------|
 | Location, Store, Distribution Center        | LocationId                       |
-| Product, Frozen Product, Perishable Product | ProductId                        |
+| Product                                     | ProductId                        |
+|Frozen Product, Perishable Product           |Productname
 | Inventory                                   | the unique ID column of **fact_inventory_positions** |
 | Supplier                                    | SupplierId                       |
 | Shipment                                    | the unique ID column of **factshipments** |
