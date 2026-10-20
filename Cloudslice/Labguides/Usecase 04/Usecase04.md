@@ -246,7 +246,7 @@ You will need your workspace ID to pass as a parameter when building the solutio
     use** : **@lab.CloudSubscription.Name**
   
     - **'Location' infrastructure
-    parameter:** **Select @lab.CloudResourceGroup(ResourceGroup1).Location**
+    parameter:** **Select westus3**
   
     - **Resource Group:** **@lab.CloudResourceGroup(ResourceGroup1).Name**
   
