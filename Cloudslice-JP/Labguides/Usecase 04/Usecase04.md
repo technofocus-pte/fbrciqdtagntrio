@@ -235,7 +235,7 @@ Unified Data Foundation Solution Accelerator 向けエージェント型アプ�
 
     - **Azure リソースの環境を作成するには**、 +++env@lab.LabInstance.Id+++を入力します。
     - **使用するAzureサブスクリプションを選択**: **@lab.CloudSubscription.Name**
-    - **「Location」インフラストラクチャパラメータ：** **ResourceGroup1 Locationを選択します**
+    - **「Location」インフラストラクチャパラメータ：** **ResourceGroup1 Locationを選択します**(westus3)
     - **リソースグループ:** **@lab.CloudResourceGroup(ResourceGroup1).Name**
 
 
