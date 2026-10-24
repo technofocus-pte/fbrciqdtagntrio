@@ -363,9 +363,9 @@ azd env set AZURE_RESOURCE_LOCATION westus2
 
 ![](./media/image58.png)
 
-4.  새 데이터 소스를 구성하려면 **Add data source**를 선택합니다.
+4.  새 데이터 소스를 구성하려면 **Add on ontology**를 선택합니다.
 
-![](./media/image59.png)
+![](./media/imgb1.png)
 
 5.  솔루션 배포로 생성된 **Ontology** 리소스(이름이 **_ontology_1**로 끝남)를 선택하고 **Add**를 클릭합니다.
 
