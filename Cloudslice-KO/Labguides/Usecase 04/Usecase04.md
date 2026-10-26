@@ -513,102 +513,111 @@ azd env set AZURE_RESOURCE_LOCATION westus2
 
 ![](./media/image91.png)
 
-## 과제 10: Microsoft Foundry에서 Fabric data agent 사용하기
+## 과제 10: Microsoft Foundry에서 Fabric 데이터 에이전트를 가져와 사용하세요
 
-1.  리소스 그룹에서 **Foundry** 리소스를 선택합니다.
+이 작업에서는 **Microsoft Foundry**에서 에이전트를 생성하고, 이를 **Fabric IQ (OneLake Catalog)** 도구를 통해 앞서 구축한 Fabric 데이터 에이전트와 연결합니다. 그러면 이 Foundry 에이전트는 Microsoft Fabric 내의 검사 데이터에 관한 자연어 질문에 답변하게 됩니다.
 
-![](./media/image92.png)
+1. Azure 포털에서 **ResourceGroup1**을 열고, 이름이 **aisa-** 로 시작하는 **Foundry** 리소스를 선택합니다.
 
-2.  **Overview** 창에서 **Go to Foundry portal**을 클릭합니다. Microsoft Foundry 포털로 이동합니다.
+   ![](./media/lab4ab1.png)
 
-![](./media/image93.png)
+2. **Overview** 창에서 **Go to Foundry portal**을 선택합니다. Microsoft Foundry 포털이 새 탭에서 열립니다.
 
-![](./media/image94.png)
+   ![](./media/lab4ab2.png)
 
-3.  Foundry 포털의 왼쪽 메뉴에서 **Agents**를 선택하면 **미리 생성된** 에이전트를 확인할 수 있습니다. 에이전트가 없으면 **+ New agent**를 클릭하여 에이전트를 생성합니다.
+3. Foundry 포털에서 **New Foundry** 토글이 켜져 있는지 확인합니다. 상단 메뉴에서 **Build**를 선택한 다음, 왼쪽 창에서 **Agents**를 선택합니다.
 
-![](./media/image95.png)
+   ![](./media/lab4ab3.png)
 
-![](./media/image96.png)
+4. **Agents** 페이지에서 **New agent** 를 선택한 다음, **Build an agent**를 선택하세요.
 
-4.  에이전트를 선택하면 오른쪽에 구성 창이 열립니다. 에이전트 이름으로 +++Fabric Agent+++를 입력합니다.
+   ![](./media/lab4ab4.png)
 
-![](./media/image97.png)
+   > **주석:** 실습 환경 배포를 통해 생성된 기존 에이전트(예: **TitleAgent** 및 **ChatAgent**)가 보일 수 있습니다. 이 에이전트들은 변경하지 마십시오.
 
-5.  같은 구성 창에서 아래로 스크롤하여 **Knowledge** 항목의 **+ Add**를 클릭합니다.
+5. **Create an agent** 대화 상자에서 **Agent name**에 +++Fabric-Agent+++를 입력하고, **Interaction mode**는 **Text**로 유지한 다음, **Create agent and open playground** 를 선택합니다.
 
-![](./media/image98.png)
+   ![](./media/lab4ab5.png)
 
-6.  **Add knowledge** 창에서 **Microsoft Fabric**을 선택합니다.
+   > **주석:** 에이전트가 생성된 후에는 상호작용 모드를 변경할 수 없습니다.
 
-![](./media/image99.png)
+6. 에이전트 플레이그라운드에서 **Tools** 섹션으로 이동하여 **Add**를 선택한 다음, **Add tools**를 선택합니다.
 
-7.  **+ Create connection**을 클릭합니다.
+   ![](./media/lab4ab6.png)
 
-![](./media/image100.png)
+7. **Select a tool** 대화 상자의 **Configured** 탭에서 **Fabric IQ (OneLake Catalog)** 를 선택한 다음, **Add tool**를 선택합니다.
 
-8.  **Custom keys**에 과제 7의 10단계에서 저장한 값을 입력하고 각 키의 **is secret**을 선택합니다. **Connection name**에 +++Fabric-aiskills+++를 입력하고 **Connect**를 클릭합니다.
+   ![](./media/lab4ab7.png)
 
-| **키** | **값** |
-|----|----|
-| +++workspace-id+++ | 저장한 **Workspace ID** |
-| +++artifact-id+++ | 저장한 **AISkills ID** |
+   > **주석:** **Fabric IQ (OneLake Catalog)** 도구를 사용하세요. 별도의 **Fabric Data Agent** 도구는 사용 환경에 따라 이용이 불가능할(비활성화되어 있을) 수 있습니다.
 
-![](./media/image101.png)
+8. **OneLake Catalog** 대화 상자에서 이 랩의 앞부분에서 생성한 Fabric 데이터 에이전트(예: **fabricagent67896x**)를 선택한 다음 **Add**를 선택합니다.
 
-9.  **Instructions** 상자에 다음 지침을 입력합니다.
+   ![](./media/lab4ab8.png)
 
-```
-당신은 Microsoft Fabric에 저장된 검사 데이터를 분석하는 데이터 보조 도구입니다.
+   > **중요:** 온톨로지나 다른 작업 공간에 있는 항목이 아닌, **data agent** 항목(에이전트 아이콘)을 선택하십시오. 그러면 해당 에이전트가 **Tools** 섹션에 <b>Fabric IQ (&lt;your-data-agent-name&gt;)</b>라는 이름으로 나타납니다.
 
-Fabric Lakehouse 데이터 세트를 사용하여 검사 결과 및 점수에 관한 질문에 답하십시오. 이 데이터 세트에는 다음과 같은 열이 포함되어 있습니다.
+9. **Instructions** 상자에서 기존 텍스트를 모두 삭제하고, 다음 지침을 붙여넣으세요:
 
-- inspection_id: 각 검사에 대한 고유 식별자
-- ticket_id: 검사 티켓과 관련된 식별자
-- result: 검사 결과 (합격 또는 불합격)
-- score: 검사에 부여된 수치 점수
+   ```
+   You are a data assistant that analyzes inspection data stored in Microsoft Fabric.
 
-데이터를 분석하고 요약하여 다음과 같은 인사이트를 제공할 수 있습니다:
+   Use the Fabric Lakehouse dataset to answer questions about inspection results and scores. The dataset includes the following columns:
+   - inspection_id: Unique identifier for each inspection
+   - ticket_id: Identifier associated with the inspection ticket
+   - result: Inspection outcome (Pass or Fail)
+   - score: Numeric score assigned to the inspection
 
-- 검사 총 횟수
-- 합격한 검사와 불합격한 검사의 수
-- 평균, 최고 및 최저 검사 점수
-- 검사 결과의 분포
-- 검사 또는 티켓별 점수 추세
+   You can analyze and summarize the data to provide insights such as:
+   - Total number of inspections
+   - Number of passed and failed inspections
+   - Average, highest, and lowest inspection scores
+   - Distribution of inspection results
+   - Score trends across inspections or tickets
 
-응답할 때:
+   When responding:
+   - Use the Fabric data source to retrieve accurate information.
+   - Provide clear summaries and insights based on the inspection results.
+   - When appropriate, suggest visualizations such as bar charts or pie charts to show pass vs fail distribution or score comparisons.
+   - Ensure answers are concise, accurate, and based only on the available dataset.
+   ```
 
-- 정확한 정보를 가져오려면 Fabric 데이터 소스를 사용하십시오.
-- 검사 결과를 바탕으로 명확한 요약과 인사이트를 제공하십시오.
-- 적절한 경우, 합격과 불합격의 분포나 점수 비교를 보여주기 위해 막대 그래프나 원형 그래프와 같은 시각화 자료를 제안하십시오.
-- 답변은 간결하고 정확하며, 제공된 데이터 세트만을 바탕으로 작성되어야 합니다.
-```
+10. 페이지 상단의 **Save**을 선택하여 에이전트를 저장합니다. **Version** 옆에 새로운 버전 번호가 나타납니다.
 
-![](./media/image102.png)
+    ![](./media/lab4ab9.png)
 
-10. 왼쪽 메뉴에서 **Agents**를 선택한 다음, **Fabric Agent**를 선택하고 **Try in playground**를 클릭합니다.
+    > **주석:** 스크린샷에는 **gpt-chat-latest** 모델이 사용되었습니다. 프로젝트에 선택된 모델을 그대로 유지하시기 바랍니다.
 
-![](./media/image103.png)
-
-11. 프롬프트를 입력할 수 있는 채팅 패널이 열립니다. 에이전트는 연결된 문서와 데이터 세트를 사용하여 응답합니다. 다음 샘플 프롬프트를 입력합니다.
+11. 오른쪽 **Chat** 창에서 에이전트를 테스트합니다. 다음 프롬프트를 입력한 후 **Send** 선택하세요:
 
     +++What constitutes a failed inspection?+++
 
-![](./media/image104.png)
+    ![](./media/lab4ab10.png)
 
-![](./media/image105.png)
+12. 응답 내용을 검토합니다. 에이전트는 Fabric 데이터 에이전트에 질의하여, 검사 실패란 <b>result = "Fail"</b>인 레코드를 의미하며, 합격 및 불합격 검사의 점수 범위에 대해서도 설명합니다.
+
+    ![](./media/lab4ab11.png)
+
+    > **힌트:** 첫 번째 응답은 에이전트가 Fabric에 연결하는 데 시간이 다소 걸릴 수 있습니다. 응답에서 **Traces** 을 선택하면 에이전트가 수행한 도구 호출 내역을 확인할 수 있습니다.
+
+13. 다음 프롬프트를 입력하세요:
 
     +++What is the total number of tickets in the system?+++
 
-![](./media/image106.png)
+    ![](./media/lab4ab12.png)
 
-![](./media/image107.png)
+14. 다음 프롬프트를 입력하세요:
 
     +++Do any inspections violate quality control standards in our Inspection Procedures?+++
 
-![](./media/image108.png)
+    ![](./media/lab4ab13.png)
 
-![](./media/image109.png)
+    > **주석:** 이 에이전트는 검사 데이터만을 바탕으로 응답합니다. **result = "Fail"** 인 검사를 품질 관리 위반으로 간주하여 표에 나열합니다. 사용자의 데이터에 따라 표시되는 수치는 스크린샷과 다를 수 있습니다.
+
+    > **중요:** AI가 생성한 응답은 부정확할 수 있습니다. 주요 수치를 공유하기 전에 Fabric Lakehouse의 데이터와 비교해 보시기 바랍니다.
+
+이제 Fabric IQ를 통해 Microsoft Foundry 에이전트를 Fabric 데이터 에이전트에 연결했습니다. 이를 통해 비즈니스 사용자는 Foundry 내에서 Fabric을 활용하여, 데이터에 근거하고 거버넌스가 적용된 답변을 얻을 수 있게 되었습니다.
+
 
 ## 과제 11: 리소스 삭제하기
 
