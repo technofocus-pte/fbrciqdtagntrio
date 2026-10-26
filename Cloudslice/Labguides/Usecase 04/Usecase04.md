@@ -460,8 +460,9 @@ You will need your workspace ID to pass as a parameter when building the solutio
 
     ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image78.png)
 
-1. Run the following command to set up app permissions
+ [!Note] The Web app URL is shown at the end of the azd up output (https://app-da<id>.azurewebsites.net). Do not open it yet - complete the next steps first.  
 
+1. Run the following command to set up app permissions and connect the app to your agent. Run this step every time after azd up.
     `python scripts/00_build_solution.py --from 09`
 
     ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image79.png)
@@ -471,6 +472,17 @@ You will need your workspace ID to pass as a parameter when building the solutio
     ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image80.png)
 
     ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image81.png)
+
+6.	Wait 5 minutes for the application to start. Then run the following command to confirm the application backend is ready:
+   
++++curl -s -o /dev/null -w "%{http_code}\n" https://api-$(azd env get-value SOLUTION_NAME).azurewebsites.net/docs+++
+
+[!Note] The command must return 200. If it returns 503, the application is still starting - wait 2 more minutes and run the command again.
+
+8.	Run the following command to confirm the app is connected to your agent. The output must show a name ending in -ChatAgent. If the output is empty, repeat step 4.
+   
++++az webapp config appsettings list -g $(azd env get-value RESOURCE_GROUP_NAME) -n api-$(azd env get-value SOLUTION_NAME) --query "[?name=='AGENT_NAME_CHAT'].value" -o tsv+++
+   
 
 1. Click on the app URL
 
@@ -485,9 +497,11 @@ You will need your workspace ID to pass as a parameter when building the solutio
     > To help you get started, here are some **Sample Questions** you can
     ask in the app:
 
-    For Retail sales analysis use case:
+   For the Inspections and Tickets use case:
+  +++What is the average score from inspections?+++
+  +++How many tickets are high priority?+++
+  +++Show tickets grouped by status+++
 
-    `Show total revenue by year for last 5 years`.
 
     ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image85.png)
 
