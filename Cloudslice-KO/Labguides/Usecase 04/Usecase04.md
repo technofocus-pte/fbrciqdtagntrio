@@ -441,6 +441,10 @@ azd env set AZURE_RESOURCE_LOCATION westus2
 
 ![](./media/image78.png)
 
+애플리케이션이 시작될 때까지 5분간 기다리십시오. 그런 다음 다음 명령을 실행하여 애플리케이션 백엔드가 준비되었는지 확인하십시오:
+
+[!참고] 해당 명령어는 200을 반환해야 합니다. 503이 반환된다면, 애플리케이션이 아직 시작 중인 것입니다. 2분 정도 더 기다린 후 명령어를 다시 실행하십시오.
+
 4.  다음 명령을 실행하여 앱 권한을 설정합니다.
 
     +++python scripts/00_build_solution.py --from 09+++
@@ -452,6 +456,11 @@ azd env set AZURE_RESOURCE_LOCATION westus2
 ![](./media/image80.png)
 
 ![](./media/image81.png)
+
+앱이 에이전트에 연결되어 있는지 확인하려면 다음 명령을 실행하세요. 출력 결과에 -ChatAgent로 끝나는 이름이 표시되어야 합니다. 출력 결과가 비어 있다면 4단계를 다시 수행하세요.
+
++++curl -s -o /dev/null -w "%{http_code}\n" https://api-$(azd env get-value SOLUTION_NAME).azurewebsites.net/docs+++
+
 
 6.  앱 URL을 클릭합니다.
 
