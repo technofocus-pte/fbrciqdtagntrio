@@ -123,11 +123,11 @@ Fabric Data Agent를 통해 Lakehouse가 연결됨에 따라, Contoso는 이제 
 
 5.  lakehouse의 **Home** 리본에서 **Open notebook** > **New notebook**을 선택하여 새 notebook을 만듭니다.
 
-![](./media/image20.png)
+![](./media/koimg1.png)
 
 6.  첫 번째 **cell**의 코드를 다음 코드로 바꾸고, 셀 왼쪽에 나타나는 **▷ Run cell**을 클릭합니다.
 
-```python
+```
 import pandas as pd
 from tqdm.auto import tqdm
 base = "https://synapseaisolutionsa.z13.web.core.windows.net/data/AdventureWorks"
