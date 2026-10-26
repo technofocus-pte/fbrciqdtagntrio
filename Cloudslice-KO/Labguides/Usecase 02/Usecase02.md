@@ -179,7 +179,6 @@ for table in (pbar := tqdm(df_tables['table'].values)):
 
 5.  AI-agent 페이지에서 **Add a data source**를 선택합니다.
 
-![](./media/image31.png)
 
 6.  **OneLake catalog** 탭에서 **AdventureWorksLH** lakehouse를 선택하고 **Add**를 선택합니다.
 
