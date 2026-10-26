@@ -539,96 +539,110 @@ You will need your workspace ID to pass as a parameter when building the solutio
     ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image91.png)
 
 
-### Task 10: Consume Fabric data agent from Microsoft Foundry Services
+## Task 10: Consume the Fabric data agent from Microsoft Foundry
 
-1. Select **Foundry**
+In this task, you create an agent in **Microsoft Foundry** and connect it to the Fabric data agent that you built earlier through the **Fabric IQ (OneLake Catalog)** tool. The Foundry agent then answers natural-language questions about the inspection data in Microsoft Fabric.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image92.png)
+1. In the Azure portal, open **ResourceGroup1**, and then select the **Foundry** resource whose name starts with **aisa-**.
 
-1. On the Overview pane, click on **Go to Foundry portal**. This will navigate you to the Microsoft Foundry portal.
+   ![](./media/lab4ab1.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image93.png)
+2. On the **Overview** pane, select **Go to Foundry portal**. The Microsoft Foundry portal opens in a new tab.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image94.png)
+   ![](./media/lab4ab2.png)
 
-    Once navigated to Foundry Portal, select **Agents** from the left menu you will already see an agent **pre created**. If not created, then please click on the **+ New agent** option to get it created.
+3. In the Foundry portal, make sure that the **New Foundry** toggle is on. Select **Build** in the top menu, and then select **Agents** in the left pane.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image95.png)
+   ![](./media/lab4ab3.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image96.png)
+4. On the **Agents** page, select **New agent**, and then select **Build an agent**.
 
-1. Select the newly created **agent**, and a configuration pane will be opened on the right. Enter the agent name as +++Fabric Agent+++
+   ![](./media/lab4ab4.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image97.png)
+   > **Note:** You may see existing agents (for example, **TitleAgent** and **ChatAgent**) that were created by the lab deployment. Don't change them.
 
-1. In the same agent configuration pane, scroll down and click on **+ Add** for **Knowledge** parameter.
+5. In the **Create an agent** dialog, enter +++Fabric-Agent+++ as the **Agent name**, keep **Interaction mode** set to **Text**, and then select **Create agent and open playground**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image98.png)
+   ![](./media/lab4ab5.png)
 
-1. In the **Add knowledge** pane, select **Microsoft Fabric**
+   > **Note:** The interaction mode can't be changed after the agent is created.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image99.png)
+6. In the agent playground, go to the **Tools** section, select **Add**, and then select **Add tools**.
 
-1. Click on **+ Create connection**
+   ![](./media/lab4ab6.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image100.png)
+7. In the **Select a tool** dialog, on the **Configured** tab, select **Fabric IQ (OneLake Catalog)**, and then select **Add tool**.
 
-1. Enter the custom keys, such as the **Workspace ID** and **AISkills ID**, that you saved in **Task 7\> Step 6**.Provide the connection name as +++Fabric-aiskills+++, and click **Connect.**
+   ![](./media/lab4ab7.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image101.png)
+   > **Note:** Use the **Fabric IQ (OneLake Catalog)** tool. The separate **Fabric Data Agent** tool may be unavailable (greyed out) in your environment.
 
-1. Enter Instructions
+8. In the **OneLake Catalog** dialog, select the Fabric data agent that you created earlier in this lab (for example, **fabricagent67896x**), and then select **Add**.
 
-    ```
-    You are a data assistant that analyzes inspection data stored in Microsoft Fabric.
-    
-    Use the Fabric Lakehouse dataset to answer questions about inspection results and scores. The dataset includes the following columns:
-    - inspection_id: Unique identifier for each inspection
-    - ticket_id: Identifier associated with the inspection ticket
-    - result: Inspection outcome (Pass or Fail)
-    - score: Numeric score assigned to the inspection
-    
-    You can analyze and summarize the data to provide insights such as:
-    - Total number of inspections
-    - Number of passed and failed inspections
-    - Average, highest, and lowest inspection scores
-    - Distribution of inspection results
-    - Score trends across inspections or tickets
-    
-    When responding:
-    - Use the Fabric data source to retrieve accurate information.
-    - Provide clear summaries and insights based on the inspection results.
-    - When appropriate, suggest visualizations such as bar charts or pie charts to show pass vs fail distribution or score comparisons.
-    - Ensure answers are concise, accurate, and based only on the available dataset.
-    ```
+   ![](./media/lab4ab8.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image102.png)
+   > **Important:** Select the **data agent** item (the agent icon), not the ontology or another item from a different workspace. The agent then appears in the **Tools** section as **Fabric IQ (&lt;your-data-agent-name&gt;)**.
 
-1. Select, **Agents** from left menu, and then choose the **Fabric Agent** agent and click on **Try in playground**.
+9. In the **Instructions** box, delete any existing text and paste the following instructions:
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image103.png)
+   ```
+   You are a data assistant that analyzes inspection data stored in Microsoft Fabric.
 
-1. A chat panel will open where you can enter your prompts. The agent will now respond using the documents and datasets you've connected.
+   Use the Fabric Lakehouse dataset to answer questions about inspection results and scores. The dataset includes the following columns:
+   - inspection_id: Unique identifier for each inspection
+   - ticket_id: Identifier associated with the inspection ticket
+   - result: Inspection outcome (Pass or Fail)
+   - score: Numeric score assigned to the inspection
 
-    Sample prompts -
-  
-    `What constitutes a failed inspection?`
+   You can analyze and summarize the data to provide insights such as:
+   - Total number of inspections
+   - Number of passed and failed inspections
+   - Average, highest, and lowest inspection scores
+   - Distribution of inspection results
+   - Score trends across inspections or tickets
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image104.png)
+   When responding:
+   - Use the Fabric data source to retrieve accurate information.
+   - Provide clear summaries and insights based on the inspection results.
+   - When appropriate, suggest visualizations such as bar charts or pie charts to show pass vs fail distribution or score comparisons.
+   - Ensure answers are concise, accurate, and based only on the available dataset.
+   ```
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image105.png)
+10. Select **Save** at the top of the page to save the agent. A new version number appears next to **Version**.
 
-    `What is the total number of tickets in the system?`
+    ![](./media/lab4ab9.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image106.png)
+    > **Note:** The screenshots use the **gpt-chat-latest** model. Keep the model that's selected for your project.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image107.png)
+11. Test the agent in the **Chat** pane on the right. Enter the following prompt, and then select **Send**:
 
-    `Do any inspections violate quality control standards in our Inspection Procedures?`
+    +++What constitutes a failed inspection?+++
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image108.png)
+    ![](./media/lab4ab10.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntrio/refs/heads/main/Cloudslice/Labguides/Usecase%2004/media/image109.png)
+12. Review the response. The agent queries the Fabric data agent and explains that a failed inspection is a record where **result = "Fail"**, together with the score ranges for passed and failed inspections.
+
+    ![](./media/lab4ab11.png)
+
+    > **Tip:** The first answer can take a little longer because the agent connects to Fabric. Select **Traces** under a response to see the tool calls that the agent made.
+
+13. Enter the following prompt:
+
+    +++What is the total number of tickets in the system?+++
+
+    ![](./media/lab4ab12.png)
+
+14. Enter the following prompt:
+
+    +++Do any inspections violate quality control standards in our Inspection Procedures?+++
+
+    ![](./media/lab4ab13.png)
+
+    > **Note:** The agent answers from the inspection data only. It treats inspections with **result = "Fail"** as quality control violations and lists them in a table. Your numbers can differ from the screenshots, depending on your data.
+
+    > **Important:** AI-generated responses can be incorrect. Compare key numbers with the data in your Fabric Lakehouse before you share them.
+
+You have now connected a Microsoft Foundry agent to your Fabric data agent through Fabric IQ, so that business users can get governed, data-grounded answers from Fabric inside Foundry.
 
 
 ### Task 11: Delete the Resources
