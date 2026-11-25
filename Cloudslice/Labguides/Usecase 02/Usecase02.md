@@ -1,428 +1,506 @@
-# Usecase 02 - Build sales analytics with AdventureWorks dataset using Fabric data agent
+# Use Case 02: Build sales analytics with AdventureWorks dataset using Fabric data agent
 
-### Introduction
+**Scenario**
 
-Contoso Analytics, a retail insights team, is transitioning its reporting workflows to **Microsoft Fabric** to improve data accessibility for analysts and business managers. The team wants to enable natural‑language data exploration so non‑technical users can get insights without writing SQL or navigating dashboards.
+**Adventure Works Cycles** is a global manufacturer and seller of bicycles, components, clothing and accessories. It sells online to individual customers (Internet sales) and through a network of resellers in North America, Europe and the Pacific.
 
-To achieve this, the team decides to build an **intelligent analytics assistant** powered by a **Fabric Data Agent**. The first step in this process is to prepare the underlying data in a **Fabric Lakehouse**. As outlined in the Fabric data agent tutorial, they begin by **creating and populating a Lakehouse**, which will hold curated retail datasets such as sales transactions, product inventory, and store profiles. This Lakehouse serves as the governed, centralized data source for downstream tasks.
+Every week the sales operations team receives dozens of ad-hoc requests from regional managers and finance: “Which product categories grew fastest last year? What were monthly and year-to-date Internet sales? Which territories depend most on resellers? How much more do repeat customers spend?” Each request means writing a new SQL query or building a one-off report, and the backlog keeps growing.
 
-Once the Lakehouse is set up, the next step is to make it accessible to conversational systems and automation tools. The team accomplishes this by **creating a Fabric Data Agent** and **adding the Lakehouse as its connected data source**, enabling secure, governed access to the data. This configuration allows the Data Agent to understand and query the Lakehouse content, forming the foundation for building natural‑language experiences across the organization.
+The Head of Sales Analytics, **Maria Lopez**, has asked the data team to deliver a **self-service, conversational analytics assistant** with these requirements:
 
-With the Lakehouse connected through the Fabric Data Agent, Contoso can now integrate the agent into analytics applications, Copilot experiences, and internal tools—empowering business users to ask questions like *“Show me today’s sales for the south region”* or *“Identify the lowest‑stock products across all stores”* and receive data‑driven answers instantly.
+- Business users ask questions in natural language and receive accurate, explainable answers backed by governed data.
 
-### Objectives
+- Answers must come only from approved sales tables in the company lakehouse, and respect each user's data permissions.
 
-- Create a **Microsoft Fabric workspace** and configure storage and permissions.
+- Analysts must be able to teach the assistant company terminology (for example, what a "repeat purchase" means) and proven query patterns.
 
-- Build a **Fabric Lakehouse** and load AdventureWorks datasets programmatically using notebooks.
+- Once validated, the assistant must be shared with colleagues and be reusable by other apps and agents.
 
-- Create and configure a **Fabric Data Agent** connected to Lakehouse tables.
+You are the **data engineer** on this project. Your job is to land the AdventureWorks sales data in a Fabric lakehouse and build, tune, publish and test the **AdventureWorks Sales Agent**.
 
-- Improve the agent’s responses using **instructions and example queries**.
+**Introduction**
 
-- Publish the agent and test it **programmatically via API calls** inside a Fabric notebook.
+Microsoft Fabric data agents let you build conversational question-and-answer experiences over your organization's data. A data agent uses generative AI to understand a question asked in plain English, choose the right data source, generate and run a query (SQL for a lakehouse or warehouse, DAX for a semantic model, or KQL for a KQL database), and return an answer that users can trace back to the query behind it.
 
-- Clean up and delete the workspace after completing the lab.
+In this lab, you help Adventure Works Cycles deliver its conversational analytics assistant. You create a Fabric workspace and a lakehouse, load the AdventureWorks sales dataset with a notebook, and create a data agent connected to the lakehouse. You then ground the agent with instructions and example SQL queries, test and refine its answers with real business questions, publish it, and finally call the published agent from a Fabric notebook through its Model Context Protocol (MCP) endpoint.
 
+By the end of the lab, sales managers and finance users at Adventure Works can ask questions such as *"What were the total internet sales by year?"* or *"Compare internet sales and reseller sales by sales territory group"* and receive accurate, data-driven answers in seconds, without waiting for a new report.
 
-## **Task 0: Sync Host environment time**
+**Objectives**
 
-1. In your VM, navigate and click in the **Search bar**, type +++Settings+++ and then click on **Settings** under **Best match**.
+- Create a **Microsoft Fabric workspace** on a Fabric capacity.
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image1.png)
+- Create a **lakehouse** and load the AdventureWorks dataset into Delta tables by using a notebook.
 
-1. On Settings window, navigate and click on **Time & language**.
+- Create a **Fabric data agent** and connect it to the lakehouse tables.
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image2.png)
+- Improve the agent's responses with **agent instructions** and **example queries**.
 
-1. On **Time & language** page, navigate and click on **Date & time**.
+- Test and refine the agent with business questions, and then **publish** it.
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image3.png)
+- Query the published agent programmatically through its **MCP endpoint** from a Fabric notebook.
 
-1. Scroll down and navigate to **Additional settings** section, then click on **Syn now** button. It will take 3-5 minutes to syn.
+## Solution architecture
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image4.png)
+The following diagram shows the components that you build in this lab and how data flows from the source files to the people and applications that use the data agent.
 
-1. Close the **Settings** window.
+![](./media/image1.png)
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image5.png)
-
-
-## Task 1: **Create a Fabric workspace**
+## Task 1: Create a Fabric workspace
 
 In this task, you will set up the foundational environment by creating a Fabric workspace that will host the Lakehouse, notebooks, and the Data Agent. This workspace acts as the central container for all assets used throughout the use case.
 
-1. Open your browser, navigate to the address bar, and type or paste the following URL:+++https://app.fabric.microsoft.com/+++ then press the **Enter** button.
+1.  Open your browser, enter the following URL in the address bar: +++https://app.fabric.microsoft.com/+++, and then press **Enter**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image6.png)
+    ![](./media/image2.png)
 
-1. In the **Microsoft Fabric** window, enter your credentials, and click on the **Submit** button.
+2.  In the **Microsoft Fabric** window, enter the following username, and then select **Submit**. You use the password in the next step.
 
-    |  |   |
-    |---|----|
-    |Username	|+++@lab.CloudPortalCredential(User1).Username+++|
-    |TAP	|+++@lab.CloudPortalCredential(User1).AccessToken+++|
+    | | |
+    |----|----|
+    | Username | +++@lab.CloudPortalCredential(User1).Username+++ |
+    | Password | +++@lab.CloudPortalCredential(User1).Password+++ |
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image7.png)
+    ![](./media/image3.png)
 
-1. Then, In the **Microsoft** window enter the password and click on the **Sign in** button.
+3.  In the **Microsoft** window, enter the password, and then select **Sign in**.
 
-    ![A login screen with a red box and blue text AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image8.png)
+    ![](./media/image4.png)
 
-1. In **Stay signed in?** window, click on the **Yes** button.
+4.  In the **Stay signed in?** window, select **Yes**.
 
-1. You’ll be directed to Power BI Home page.
+5.  You are redirected to the **Microsoft Fabric** home page.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image9.png)
+    ![](./media/image5.png)
 
-1. Fabric home page, select **+New workspace** tile.
+6.  On the Fabric home page, select the **+ New workspace** tile.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image10.png)
+    ![](./media/image6.png)
 
-1. In the **Create a workspace** pane that appears on the right side, enter the following details, and click on the **Apply** button.
+7.  In the **Create a workspace** pane that appears on the right, enter the following details, and then select **Apply**.
 
-    | Property | Value |
-    |---------|-------|
-    | Name | +++Fabric Data agent-@lab.LabInstance.Id+++ |
-    | Advanced | Under **License mode**, select **Fabric** |
-    | Default storage format | Small dataset storage format |
-    | Template apps | Check **Develop template apps** |
+    | **Property**           | **Value**                                                         |
+    |------------------------|-------------------------------------------------------------------|
+    | Name                   | +++Fabric Data agent-@lab.LabInstance.Id+++ (must be a unique Id) |
+    | Advanced               | Under License mode, select Fabric                                 |
+    | Default storage format | Small dataset storage format                                      |
+    | Template apps          | Check the Develop template apps                                   |
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image11.png)
+    ![](./media/image7.png)
 
-    >[!Note] To find your lab instant ID, select 'Help' and copy the instant ID.
+    **Note:** To find your lab instance ID, select **Help** in the lab interface and copy the **ID** value.
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image12.png)
+    ![](./media/image8.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image13.png)
+    ![](./media/image9.png)
 
-1. Wait for the deployment to complete. It takes 1-2 minutes to complete.
+8.  Wait for the workspace to be created. This takes 1–2 minutes. The new, empty workspace opens.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image14.png)
+    ![](./media/image10.png)
 
+## Task 2: Create the AdventureWorksLH lakehouse and load data
 
-## Task 2: Create a lakehouse with AdventureWorksLH
+In this task, you create a lakehouse and populate it with the AdventureWorks tables by using a Fabric notebook. The lakehouse is the governed data foundation that the data agent queries.
 
-This task guides you through creating a new Lakehouse and populating it with AdventureWorks tables using a Fabric notebook. The Lakehouse becomes the structured data foundation that the Data Agent will query.
+1.  On the workspace page, select **+ New item** on the command bar.
 
-1. Create a new lakehouse by clicking on the **+New item** button in the navigation bar.
+    ![](./media/image11.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image15.png)
+2.  In the **New item** pane, select the **Lakehouse** tile.
 
-1. Click on the "**Lakehouse**" tile.
+    ![](./media/image12.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image16.png)
+3.  In the **New lakehouse** dialog box, enter +++AdventureWorksLH+++ in the **Name** field, leave **Lakehouse schemas** cleared, and then select **Create**. The new lakehouse opens.
 
-1. In the **New lakehouse** dialog box, enter +++AdventureWorksLH+++ in the +++Name+++ field, click on the **Create** button and open the new lakehouse.
+    **Note:** Make sure there is no leading space before **AdventureWorksLH** in the name.
 
-    >[!Note] Ensure to remove space before **AdventureWorksLH**
+    ![](./media/image13.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image17.png)
+    ![](./media/image14.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image18.png)
+4.  When the lakehouse is ready, a **Successfully created SQL endpoint** notification appears.
 
-1. You will see a notification stating **Successfully created SQL endpoint**.
+    ![](./media/image15.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image19.png)
+5.  On the lakehouse ribbon, select **Analyze data with** \> **Notebook** \> **New notebook**. A new notebook opens with the lakehouse attached.
 
-1. From the Lakehouse home page, select the drop-down arrow next to Analyze data with, select New notebook, and then choose Notebook to create a new Spark notebook.
+    ![](./media/image16.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/img1.png)
+6.  Replace the code in the first cell with the following code, and then select **▷ Run cell** to the left of the cell. The code downloads each AdventureWorks Parquet file and saves it as a Delta table in the lakehouse.
 
-1. Update the code in the **cell** with the following code and click on **▷ Run cell** that appears to the left of the cell.
-  
-    ```
+    ```python
     import pandas as pd
     from tqdm.auto import tqdm
     base = "https://synapseaisolutionsa.z13.web.core.windows.net/data/AdventureWorks"
-    
+
     # load list of tables
     df_tables = pd.read_csv(f"{base}/adventureworks.csv", names=["table"])
-    
+
     for table in (pbar := tqdm(df_tables['table'].values)):
         pbar.set_description(f"Uploading {table} to lakehouse")
-    
+
         # download
         df = pd.read_parquet(f"{base}/{table}.parquet")
-    
+
         # save as lakehouse table
         spark.createDataFrame(df).write.mode('overwrite').saveAsTable(table)
     ```
-  
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image21.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image22.png)
+    ![](./media/image17.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image23.png)
+7.  Wait for the cell to finish running. A progress bar shows each table as it is uploaded; loading all tables takes about 5–7 minutes.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image24.png)
+    ![](./media/image18.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image25.png)
+8.  In the **Explorer** pane, expand **AdventureWorksLH**, select the **…** (ellipsis) next to **Tables**, and then select **Refresh**.
 
+    ![](./media/image19.png)
 
-## Task 3: Create Data agent
+9.  Expand **Tables** and verify that the AdventureWorks tables, such as **dimcustomer**, **dimdate**, **dimproduct** and **factinternetsales**, appear.
 
-In this task, you will create a Fabric Data Agent and connect it to the Lakehouse. You will select the required Dimension and Fact tables to enable the agent to answer a wide range of sales‑related analytics questions.
+    ![](./media/image20.png)
 
-1. Now, click on **Fabric Data agent-@lab.LabInstance.Id** on the left-sided navigation pane.
+## Task 3: Create a Fabric data agent
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image26.png)
+In this task, you create a Fabric data agent and connect it to the lakehouse. You select the dimension and fact tables that the agent needs to answer a wide range of sales analytics questions.
 
-1. In the **Fabric** home page, select **+New item.**
+1.  In the left navigation pane, select your **Fabric Data agent-XXXXXX** workspace.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image27.png)
+    ![](./media/image21.png)
 
-1. In the **Filter by item type** search box, enter +++data agent+++ and select the **Data agent.**
+2.  On the workspace page, select **+ New item**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/img2.png)
+    ![](./media/image22.png)
 
-1. Enter +++AI-agent+++ as the Data agent name and select **Create**.
+3.  In the **Filter by item type** search box, enter +++data agent+++, and then select the **Data agent** tile.
 
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image29.png)
+    ![](./media/image23.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/lab2a2.png)
+4.  In the **Create data agent** dialog box, enter +++AI-agent+++ as the name, and then select **Create**.
 
-1. In AI-agent page, select **Add a data source**.
+    ![](./media/image24.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/lab2a1.png)
+    ![](./media/image25.png)
 
-1. In the **OneLake catalog** tab, select the **AI-Fabric_lakehouse lakehouse** and select **Add**.
+5.  On the **AI-agent** page, under **Build your data agent**, select **Add a data source**.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image32.png)
+    ![](./media/image26.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/lab2a4.png)
+6.  In the **OneLake catalog** window, select the **AdventureWorksLH** lakehouse, and then select **Add**.
 
-1. You must then select the tables for which you want the AI skill to have available access.
+    ![](./media/image27.png)
 
-    This lab uses these tables:
+    ![](./media/image28.png)
 
+7.  In the **Explorer** pane, expand **AdventureWorksLH** \> **Schemas** \> **dbo** \> **Tables**, and select the checkboxes for the following tables. The agent can answer questions only from the tables you select.
 
-    - DimCustomer
-  
-    - DimDate
-  
-    - DimGeography
-  
-    - DimProduct
-  
-    - DimProductCategory
-  
-    - DimPromotion
-  
-    - DimReseller
-  
-    - DimSalesTerritory
-  
-    - FactInternetSales
-  
-    - FactResellerSales
+    - dimcustomer
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/lab2a5.png)
+    - dimdate
 
+    - dimgeography
 
-## Task 4: Provide instructions
+    - dimproduct
 
-Here, you will enrich the Data Agent by adding natural language questions and their corresponding SQL queries. These examples help the agent understand domain‑specific context and generate more accurate SQL responses for real‑world queries.
+    - dimproductcategory
 
-1. When you first ask the questions with the listed tables select **factinternetsales**, the data agent answers them fairly well.
+    - dimpromotion
 
-1. For instance, for the question +++What is the most sold product?+++
+    - dimreseller
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/lab2a6.png)
+    - dimsalesterritory
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image36.png)
+    - factinternetsales
 
-1. Copy the question and SQL queries and paste them in a notepad and then Save the notepad to use the information in the upcoming tasks.
+    - factresellersales
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image37.png)
+    ![](./media/image29.png)
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image38.png)
+    ![](./media/image30.png)
 
-1. Select **FactResellerSales** and enter the following text and click on the **Submit icon** as shown in the below image.
+## Task 4: Provide agent instructions
 
-    +++What is our most sold product?+++
+In this task, you add agent instructions that describe the data, define business terms and set formatting rules for answers. Instructions help the agent choose the right tables and interpret questions the way your business does.
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image39.png)
+1.  On the data agent ribbon, select **Agent instructions**. The **Agent instructions** pane opens.
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image40.png)
-  
-    As you continue to experiment with queries, you should add more instructions.
+    ![](./media/image31.png)
 
-1. Select the **dimcustomer** , enter the following text and click on the **Submit icon**
+2.  Copy the following text and paste it into the **Agent instructions** box:
 
-    +++how many active customers did we have June 1st, 2013?+++
+    ```text
+    You are the AdventureWorks Sales Agent for Adventure Works Cycles.
+    Answer questions about customers, products, promotions, resellers,
+    sales territories and sales using the AdventureWorksLH lakehouse.
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image41.png)
+    Data source AdventureWorksLH contains:
+    - dimcustomer: customer demographics and contact information
+    - dimdate: calendar and fiscal date attributes
+    - dimgeography: city, state/province, postal code and country/region
+    - dimproduct, dimproductcategory: products and product categories
+    - dimpromotion: promotions and discounts
+    - dimreseller: reseller (business customer) details
+    - dimsalesterritory: sales territory region, country and group
+    - factinternetsales: online sales to individual customers
+    - factresellersales: sales through resellers
 
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image42.png)
-
-1. Copy the all question and SQL queries and paste them in a notepad and then Save the notepad to use the information in the upcoming tasks.
-
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image43.png)
-
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image44.png)
-
-1. Select the **dimdate**, **FactInternetSales** , enter the following text and click on the **Submit icon:**
-  
-    +++what are the monthly sales trends for the last year?+++
-
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image45.png)
-
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image46.png)
-
-1. Select the **dimproduct,** **FactInternetSales** , enter the following text and click on the **Submit icon:**
-
-    +++which product category had the highest average sales price?+++
-
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image47.png)
-
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image48.png)
-
-    Part of the problem is that "active customer" doesn't have a formal definition. More instructions in the notes to the model text box might help, but users might frequently ask this question. You need to make sure that the AI handles the question correctly.
-
-1. The relevant query is moderately complex, so provide an example by selecting the **Example queries** button from the **Setup** pane.
-
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/lab2a7.png)
-
-1. In the Example queries tab, select the **Add example.**
-
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/lab2a8.png)
-
-1. Here, you should add Example queries for the lakehouse data source that you have created. Add the below question in the question field:
-
-    +++What is the most sold product?+++
-
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image51.png)
-
-1. Add the query1 that you have saved in the notepad:
-
+    Business rules:
+    - "Sales" or "revenue" means SUM(SalesAmount) unless stated otherwise.
+    - "Internet sales" uses factinternetsales; "reseller sales" uses
+      factresellersales; "total sales" combines both.
+    - Use OrderDate for time-based questions unless asked otherwise.
+    - A "repeat purchase" is any purchase after a customer's first purchase.
+    - Show currency values rounded to 2 decimals.
+    - If a question is ambiguous, state the assumption you made.
     ```
-    SELECT TOP 1 ProductKey, SUM(OrderQuantity) AS TotalQuantitySold
-    FROM [dbo].[factinternetsales]
-    GROUP BY ProductKey
-    ORDER BY TotalQuantitySold DESC
+
+    ![](./media/image32.png)
+
+3.  Close the **Agent instructions** pane. The instructions are saved automatically.
+
+## Task 5: Add example queries for the lakehouse
+
+In this task, you add example question-and-SQL pairs for the lakehouse. The agent uses these examples as patterns when it generates SQL for similar questions, which improves accuracy for complex calculations such as repeat-purchase growth and running totals.
+
+1.  In the **Explorer** pane, select the **Setup** tab, and then select **Example queries** under **AdventureWorksLH**.
+
+    ![](./media/image33.png)
+
+2.  In the **Example queries** pane, select **Add example**.
+
+    ![](./media/image34.png)
+
+3.  In **Example query 1**, enter the following text in the **Question** box:
+
+    +++Calculate the average percentage increase in sales amount for repeat purchases for every zipcode. Repeat purchase is a purchase subsequent to the first purchase (the average should always be computed relative to the first purchase)+++
+
+4.  In the **SQL query** box, enter the following query:
+
+    ```sql
+    SELECT AVG((s.SalesAmount - first_purchase.SalesAmount) / first_purchase.SalesAmount * 100) AS AvgPercentageIncrease
+    FROM factinternetsales s
+    INNER JOIN dimcustomer c ON s.CustomerKey = c.CustomerKey
+    INNER JOIN dimgeography g ON c.GeographyKey = g.GeographyKey
+    INNER JOIN (
+        SELECT *
+        FROM (
+            SELECT
+                CustomerKey,
+                SalesAmount,
+                OrderDate,
+                ROW_NUMBER() OVER (PARTITION BY CustomerKey ORDER BY OrderDate) AS RowNumber
+            FROM factinternetsales
+        ) AS t
+        WHERE RowNumber = 1
+    ) first_purchase ON s.CustomerKey = first_purchase.CustomerKey
+    WHERE s.OrderDate > first_purchase.OrderDate
+    GROUP BY g.PostalCode;
     ```
-  
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image52.png)
 
-1. To add a new query field, click on **+Add.**
+    ![](./media/image35.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image53.png)
+5.  Select **+ Add** to add a second example, and then enter the following text in the **Question** box:
 
-1. To add a second question in the question field:
+    +++Show the monthly total and year-to-date total sales. Order by year and month.+++
 
-    +++What are the monthly sales trends for the last year?+++
+6.  In the **SQL query** box, enter the following query:
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image54.png)
-
-1. Add the query3 that you have saved in the notepad:
-  
-    ```
+    ```sql
     SELECT
-        d.CalendarYear,
-        d.MonthNumberOfYear,
-        d.EnglishMonthName,
-        SUM(f.SalesAmount) AS TotalSales
-    FROM
-        dbo.factinternetsales f
-        INNER JOIN dbo.dimdate d ON f.OrderDateKey = d.DateKey
-    WHERE
-        d.CalendarYear = (
-            SELECT MAX(CalendarYear)
-            FROM dbo.dimdate
-            WHERE DateKey IN (SELECT DISTINCT OrderDateKey FROM dbo.factinternetsales)
-        )
-    GROUP BY
-        d.CalendarYear,
-        d.MonthNumberOfYear,
-        d.EnglishMonthName
-    ORDER BY
-        d.MonthNumberOfYear
+        Year,
+        Month,
+        MonthlySales,
+        SUM(MonthlySales) OVER (PARTITION BY Year ORDER BY Year, Month ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS CumulativeTotal
+    FROM (
+        SELECT
+           YEAR(OrderDate) AS Year,
+           MONTH(OrderDate) AS Month,
+           SUM(SalesAmount) AS MonthlySales
+        FROM factinternetsales
+        GROUP BY YEAR(OrderDate), MONTH(OrderDate)
+    ) AS t
     ```
-  
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image55.png)
 
-1. To add a new query field, click on **+Add.**
+    ![](./media/image36.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image56.png)
+    ![](./media/image37.png)
 
-1. To add a third question in the question field:
+7.  Confirm that both examples show no validation errors, and then close the **Example queries** pane.
 
-    +++Which product category has the highest average sales price?+++
+    ![](./media/image38.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image57.png)
+    **Note:** Adding example question/query pairs isn't currently supported for Power BI semantic model data sources.
 
-1. Add the query4 that you have saved in the notepad:
+## Task 6: Test and refine the data agent
 
+In this task, you act as a business user from the sales team and validate the agent's answers. You then refine the agent so that it handles an ambiguous question correctly.
+
+Enter each of the following questions in the chat box at the bottom of the **Test the agent's responses** pane, select **Send**, and review the answer.
+
+1.  Enter +++What were the total internet sales by year?+++ and select **Send**.
+
+    ![](./media/image39.png)
+
+    ![](./media/image40.png)
+
+2.  Enter +++Show the monthly total and year-to-date total sales for 2013. Order by month.+++ and select **Send**.
+
+    ![](./media/image41.png)
+
+    ![](./media/image42.png)
+
+3.  Enter +++Which 5 product categories generated the highest internet sales?+++ and select **Send**.
+
+    ![](./media/image43.png)
+
+4.  Enter +++Compare internet sales and reseller sales by sales territory group.+++ and select **Send**.
+
+    ![](./media/image44.png)
+
+    ![](./media/image45.png)
+
+5.  Enter +++How many customers are there in each country/region?+++ and select **Send**.
+
+6.  Enter +++What is the average percentage increase in sales amount for repeat purchases by zipcode? Show the top 10.+++ and select **Send**.
+
+7.  For at least one answer, select **Expand response** to see the **SQL query that the agent generated** and the tables it used.
+
+8.  Compare the SQL generated for the year-to-date question with the example query that you added in Task 5. Notice how the agent reuses the same pattern.
+
+9.  Now test an ambiguous question. Enter +++What were sales last year?+++ and select **Send**. Observe how the agent handles the missing context.
+
+    ![](./media/image46.png)
+
+    ![](./media/image47.png)
+
+10. Select **Agent instructions** and add the following rule at the end of the instructions: +++When no year is specified for "last year", use the latest full year available in dimdate that has sales.+++
+
+    ![](./media/image48.png)
+
+11. Ask +++What were sales last year?+++ again and compare the answer. The agent now identifies the most recent full year with sales and returns its total.
+
+    ![](./media/image49.png)
+
+    ![](./media/image50.png)
+
+12. Optionally, add another example query for a question that your users ask often (for example, top resellers by sales).
+
+    **Tip:** Treat tuning as an iterative loop: test → inspect SQL → improve instructions or examples → test again. Collect real questions from colleagues and make sure the examples reflect them.
+
+## Task 7: Publish the data agent
+
+When the agent's answers are accurate, publish it so that colleagues and other applications can use it.
+
+1.  On the data agent ribbon, select **Publish**.
+
+    ![](./media/image51.png)
+
+2.  In the **Publish data agent** dialog box, enter +++Answers questions about Adventure Works customers, products and sales.+++ in **Description of purpose and capabilities**, and then select **Publish**.
+
+    ![](./media/image52.png)
+
+    ![](./media/image53.png)
+
+3.  When the **Successfully published data agent** notification appears, select **View publishing details**. The data agent settings pane opens.
+
+    ![](./media/image54.png)
+
+4.  Select **Model Context Protocol** and review the **MCP server name**, **MCP server URL** and **MCP server tool**. The published agent can now be used as an MCP server.
+
+    ![](./media/image55.png)
+
+## Task 8: Query the agent programmatically via MCP
+
+Developers can call a published data agent from code. In this task, you call the agent's MCP endpoint from a Fabric notebook.
+
+**Important:** OpenAI retired the Assistants API, so applications should use the **MCP endpoint** for agent interactions. The MCP endpoint doesn't manage conversations for you – callers must keep conversation state and send relevant context across requests.
+
+1.  Open the **AI-agent** data agent and look at the browser address bar. Copy the GUID after **/groups/** and save it in Notepad. This is your **workspace ID**.
+
+2.  Copy the GUID after **/aiskills/** in the same URL and save it in Notepad. This is your **data agent ID**. You can also find both IDs in the **MCP server URL** that you reviewed in Task 7.
+
+    ![](./media/image56.png)
+
+3.  In the left navigation pane, open **Notebook 1**, the notebook that you created in Task 2.
+
+    ![](./media/image57.png)
+
+4.  Select **+ Add cell** to add a new code cell. Enter the following command to install the MCP Python SDK, and then run the cell:
+
+    +++%pip install "mcp>=1.9,<2"+++
+
+    ![](./media/image58.png)
+
+    ![](./media/image59.png)
+
+    ![](./media/image60.png)
+
+5.  Select **+ Add cell**, paste the following code, replace the placeholder workspace and data agent IDs with the values that you copied, and then run the cell:
+
+    ```python
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamablehttp_client
+
+    workspace_id = "<your-workspace-id>"
+    data_agent_id = "<your-data-agent-id>"
+    question = "What were the total internet sales by year?"
+
+    mcp_url = (
+        f"https://api.fabric.microsoft.com/v1/mcp/workspaces/{workspace_id}"
+        f"/dataagents/{data_agent_id}/agent"
+    )
+
+    def get_auth_headers():
+        # Inside a Fabric notebook, get a Microsoft Entra token for the signed-in user
+        token = notebookutils.credentials.getToken("pbi")
+        return {"Authorization": f"Bearer {token}"}
+
+    async def query_data_agent(question):
+        headers = get_auth_headers()
+        async with streamablehttp_client(mcp_url, headers=headers) as (read, write, _):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                # The data agent exposes a single tool. Discover it, then call it.
+                tools = await session.list_tools()
+                tool = tools.tools[0]
+                question_arg = next(iter(tool.inputSchema["properties"]))
+                result = await session.call_tool(tool.name, {question_arg: question})
+                answers = [b.text for b in result.content if b.type == "text"]
+                return "\n".join(answers)
+
+    # Notebooks already run an event loop, so use top-level await
+    answer = await query_data_agent(question)
+    print(answer)
     ```
-    SELECT TOP 1
-        dp.ProductSubcategoryKey AS ProductCategory,
-        AVG(fis.UnitPrice) AS AverageSalesPrice
-    FROM
-        dbo.factinternetsales fis
-    INNER JOIN
-        dbo.dimproduct dp ON fis.ProductKey = dp.ProductKey
-    GROUP BY
-        dp.ProductSubcategoryKey
-    ORDER BY
-        AverageSalesPrice DESC
-    ```
-  
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image58.png)
 
-1. Add all the queries and SQL queries that you have saved in Notepad, and then click on ‘**Export all’**
+    ![](./media/image61.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image59.png)
+    ![](./media/image62.png)
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image60.png)
+6.  Review the answer printed below the cell. To ask another question, change the **question** variable and run the cell again.
 
+7.  When you are done, select **Stop session** on the notebook ribbon to release capacity.
 
-## Task 5: Publish the Data agent
+    ![](./media/image63.png)
 
-Both instructions and examples were added to the Data agent. As testing proceeds, more examples and instructions can improve the AI skill even further. Work with your colleagues to see if you provided examples and instructions that cover the kinds of questions they want to ask.
+    **Note:** The Microsoft Learn sample uses an Azure Identity credential object (for example, AzureCliCredential) when running outside Fabric. Inside a Fabric notebook, authentication is handled for you; notebookutils.credentials.getToken is used here as a convenience. If you receive a 401 error, request a token for the audience https://api.fabric.microsoft.com instead.
 
-You can use the AI skill programmatically within a Fabric notebook. To determine whether or not the AI skill has a published URL value.
+    **Important:** When calling a data agent programmatically, add a timeout to any polling logic, keep polling frequency low (2–5 seconds), clean up resources you create, and stop the notebook session when finished to release capacity.
 
-1. In the Data agent Fabric page, in the **Home** ribbon select the **Settings**.
+**Summary**
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image61.png)
+In this lab, you built a conversational sales analytics assistant for Adventure Works Cycles by using a Microsoft Fabric data agent. You:
 
-1. Before you publish the AI skill, it doesn't have a published URL value, as shown in this screenshot.
+- Created a Fabric workspace and a lakehouse, and loaded the AdventureWorks dataset into Delta tables with a PySpark notebook.
 
-1. Close the AI Skill setting.
+- Created the **AI-agent** data agent and limited it to the ten dimension and fact tables needed for sales analysis.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image62.png)
+- Grounded the agent with instructions that define business terms such as "sales", "internet sales" and "repeat purchase", and with example SQL queries for complex calculations.
 
-1. In the **Home** ribbon, select the **Publish**.
+- Tested the agent with business questions, inspected the generated SQL, and refined the instructions so that the agent handles ambiguous questions such as "last year".
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image63.png)
+- Published the agent and reviewed its MCP server details.
 
-    ![](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image64.png)
+- Called the published agent from a Fabric notebook through its MCP endpoint.
 
-1. Click on the **View publishing details**
-
-   
-## **Task 6: Delete the resources**
-
-1. Select your workspace, the **AI-Fabric-@lab.LabInstance.Id** from the left-hand navigation menu. It opens the workspace item view.
-
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image73.png)
-
-1. Select the **...** option under the workspace name and select **Workspace settings**.
-
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image74.png)
-
-1. Select **Other** and **Remove this workspace.**
-
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image75.png)
-
-1. Click on **Delete** in the warning that pops up.
-
-    ![A screenshot of a computer Description automatically generated](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image76.png)
-
-    ![A screenshot of a computer AI-generated content may be incorrect.](https://raw.githubusercontent.com/technofocus-pte/fbrciqdtagntsfrntr/refs/heads/main/Cloudslice/Labguide/Usecase%2002/media/image77.png)
-
-
-### Summary:
-
-In this lab, you learned how to unlock the power of conversational analytics using Microsoft Fabric’s Data Agent. You configured a Fabric workspace, ingested structured data into a lakehouse, and set up an AI skill to translate natural language questions into SQL queries. You also enhanced the AI agent’s capabilities by providing instructions and examples to refine query generation. Finally, you called the agent programmatically from a Fabric notebook, demonstrating end-to-end AI integration. This lab empowers you to make enterprise data more accessible, usable, and intelligent for business users through natural language and generative AI technologies.
+With this solution, Adventure Works moves from a backlog of ad-hoc report requests to governed, self-service analytics: business users get trustworthy answers in natural language, analysts control how the agent interprets the data, and developers can reuse the same agent in other apps and agents.
